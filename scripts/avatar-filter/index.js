@@ -12,6 +12,13 @@ const options = require("./options");
 
 const { input, s3 } = options;
 
+const delay = (timeout) =>
+	new Promise((resolve) => {
+		setTimeout(() => {
+			resolve();
+		}, timeout);
+	});
+
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
 const outputDir = path.resolve(__dirname, "../../output");
@@ -21,13 +28,14 @@ const s3BucketName = s3Split.shift();
 const s3BucketKey = s3Split.join("/");
 const s3Client = new S3({ params: { Bucket: s3BucketName } });
 
+let sourceImages = [];
+
 if (!s3) {
 	// Create dir
 	mkdirp.sync(path.resolve(outputDir, `filtered--${currentTs}`));
 
 	(async () => {
 		const stat = await fs.lstat(input);
-		let sourceImages = [];
 		if (stat.isFile()) {
 			// Use file as image
 			sourceImages.push(path.resolve(input));
@@ -39,8 +47,8 @@ if (!s3) {
 		console.log(sourceImages);
 
 		// For each image
-		// 1. set a OBS scene
-		// 2. Execute Snap Camera
+		// 1. Set a OBS scene image source file.
+		// 2. Execute Snap Camera.
 		// 3. Remove the green screen background.
 
 		try {
@@ -49,39 +57,12 @@ if (!s3) {
 			console.log(
 				chalk.green(`Success! We're connected & authenticated with OBS.`)
 			);
-			const currentScene = await obs.send("GetCurrentScene");
-			console.log(currentScene);
 
-			const sourceName = `Auto Image ${Date.now()}`;
-			const imageSource = await obs.send("CreateSource", {
+			const sourceName = `Image`;
+			await obs.send("SetSourceSettings", {
 				sourceName,
-				sourceKind: "image_source",
-				sceneName: currentScene.name,
 				sourceSettings: {
-					file: sourceImages[0]
-				}
-			});
-
-			console.log(imageSource);
-
-			// const sourceSettings = await obs.send("GetSourceSettings", {
-			// 	sourceName
-			// });
-			// console.log(sourceSettings);
-			// const sourceSettings = await obs.send("SetSourceSettings", {
-			// 	sourceName
-			// });
-			// console.log(sourceSettings);
-
-			await obs.send("SetSceneItemProperties", {
-				item: {
-					id: imageSource.itemId
-				},
-				bounds: {
-					type: "OBS_BOUNDS_SCALE_TO_HEIGHT"
-				},
-				position: {
-					alignment: 1
+					file: sourceImages[8]
 				}
 			});
 
