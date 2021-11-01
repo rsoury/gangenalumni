@@ -69,7 +69,7 @@ const q = new Queue(
 									})
 								);
 							}
-							return done({ id });
+							return done(null, { id });
 						}
 					);
 				}
@@ -82,7 +82,7 @@ const q = new Queue(
 						if (err) {
 							return done(ono(err, { id }));
 						}
-						return done({ id });
+						return done(null, { id });
 					}
 				);
 			})
