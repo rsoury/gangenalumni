@@ -1,0 +1,45 @@
+{
+  "name": "npc-companions",
+  "version": "1.0.0",
+  "description": "NPC Companions NFT Collection",
+  "main": "index.js",
+  "author": "Ryan Soury",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "avatars": "node ./scripts/avatar-generator",
+    "lint": "solhint contracts/**/*.sol",
+    "format": "prettier --write contracts/**/*.sol"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "chai": "^4.3.4",
+    "dotenv": "^10.0.0",
+    "eslint": "^8.1.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-prettier": "^4.0.0",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.4.4",
+    "hardhat": "^2.6.0",
+    "prettier": "^2.3.2",
+    "prettier-plugin-solidity": "^1.0.0-beta.17",
+    "solhint": "^3.3.6",
+    "solhint-plugin-prettier": "^0.0.5"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1018.0",
+    "axios": "^0.24.0",
+    "axios-retry": "^3.2.4",
+    "better-queue": "^3.8.10",
+    "chalk": "^4.1.2",
+    "commander": "^8.3.0",
+    "is-numeric": "^0.0.9",
+    "mkdirp": "^1.0.4",
+    "ono": "^7.1.3",
+    "user-agents": "^1.0.822"
+  }
+}

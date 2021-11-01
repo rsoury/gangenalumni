@@ -1,0 +1,27 @@
+{
+	"trailingComma": "none",
+	"tabWidth": 2,
+	"useTabs": true,
+	"semi": true,
+	"bracketSpacing": true,
+	"singleQuote": false,
+	"overrides": [
+		{
+			"files": "*.yml",
+			"options": {
+				"useTabs": false
+			}
+		},
+		{
+			"files": "*.sol",
+			"options": {
+				"printWidth": 80,
+				"tabWidth": 4,
+				"useTabs": true,
+				"singleQuote": false,
+				"bracketSpacing": true,
+				"explicitTypes": "always"
+			}
+		}
+	]
+}
