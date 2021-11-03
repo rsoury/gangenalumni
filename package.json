@@ -6,6 +6,9 @@
 	"author": "Ryan Soury",
 	"license": "UNLICENSED",
 	"private": true,
+	"engines": {
+		"node": ">=8.0.0 <=12.22.7"
+	},
 	"scripts": {
 		"filter": "node ./scripts/avatar-filter",
 		"generate": "node ./scripts/avatar-generator",
@@ -17,7 +20,7 @@
 		"@nomiclabs/hardhat-waffle": "^2.0.1",
 		"chai": "^4.3.4",
 		"dotenv": "^10.0.0",
-		"eslint": "^8.1.0",
+		"eslint": "^7",
 		"eslint-config-airbnb-base": "^14.2.1",
 		"eslint-config-prettier": "^8.3.0",
 		"eslint-import-resolver-alias": "^1.1.2",
@@ -38,12 +41,15 @@
 		"better-queue": "^3.8.10",
 		"chalk": "^4.1.2",
 		"commander": "^8.3.0",
+		"del": "^6.0.0",
 		"glob": "^7.2.0",
 		"glob-promise": "^4.2.2",
 		"is-numeric": "^0.0.9",
 		"mkdirp": "^1.0.4",
 		"obs-websocket-js": "^4.0.3",
 		"ono": "^7.1.3",
+		"robotjs": "^0.6.0",
+		"sharp": "^0.29.2",
 		"user-agents": "^1.0.822"
 	}
 }

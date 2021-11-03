@@ -18,7 +18,7 @@ const userAgent = ua.toString();
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
-const outputDir = path.resolve(__dirname, "../../output");
+const outputDir = path.resolve(__dirname, "../../output/step1");
 
 const s3Split = s3.replace("s3://", "").split("/");
 const s3BucketName = s3Split.shift();

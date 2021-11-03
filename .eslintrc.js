@@ -30,6 +30,7 @@ module.exports = {
 		"no-extra-boolean-cast": 0,
 		"no-underscore-dangle": 0,
 		camelcase: 0,
-		"no-multi-assign": 0
+		"no-multi-assign": 0,
+		"no-await-in-loop": 0
 	}
 };
