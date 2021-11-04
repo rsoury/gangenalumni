@@ -17,6 +17,8 @@ const os = require("os");
 const sharp = require("sharp");
 const del = require("del");
 const { exec } = require("child-process-promise");
+const Queue = require("better-queue");
+const chokidar = require("chokidar");
 const debugLogger = require("debug")("avatar-filter");
 
 const options = require("./options");
@@ -79,60 +81,97 @@ if (!s3) {
 		debugLogger(`homedir: ${os.homedir()}`);
 		debugLogger(`Snap output dir: ${snapOutputDir}`);
 
-		for (let i = 0; i < 1; i += 1) {
-			try {
-				// Set OBS image source file
-				await obs.send("SetSourceSettings", {
-					sourceName,
-					sourceSettings: {
-						file: sourceImages[i]
+		const q = new Queue(
+			({ image, i }, done) => {
+				(async () => {
+					// Set OBS image source file
+					await obs.send("SetSourceSettings", {
+						sourceName,
+						sourceSettings: {
+							file: image
+						}
+					});
+
+					await delay(500);
+
+					await exec(path.resolve(__dirname, "../../bin/snapcamera")); // Execute binary produced from main.go in root.
+
+					// Remove snapIndex and file increment as the Snap output file is cleaned at the end of the process.
+					const snapOutputFilename = `Snap Camera Photo${
+						snapImages.length === 0 ? "" : ` ${snapImages.length + 1}`
+					}.jpg`;
+					const snapOutputImage = path.join(snapOutputDir, snapOutputFilename);
+					const outputFile = path.join(outputDir, path.basename(image));
+
+					debugLogger(`Snap output image: ${snapOutputImage}`);
+
+					await delay(500); // Buffer for the image creation...
+
+					try {
+						await fs.access(snapOutputImage, fs.F_OK);
+					} catch (err) {
+						// throw ono(err, `Cannot find file ${snapOutputImage}`);
+
+						// Wait for the Snap Image to appear.
+						// If there is a timeout, then error...
+						await new Promise((resolve, reject) => {
+							let timeout;
+							const watcher = chokidar
+								.watch(snapOutputDir)
+								.on("file", (event, newPath) => {
+									if (path.basename(newPath) === snapOutputFilename) {
+										clearTimeout(timeout);
+										resolve();
+									}
+								});
+							timeout = setTimeout(() => {
+								watcher.unwatch();
+								reject(new Error(`Cannot find file ${snapOutputImage}`));
+							}, 15000);
+						});
 					}
-				});
 
-				// Use RobotJS to manipulate Snap Camera -- Going to use a Hotkey... so we just need to emulate the keyboard action...
-				// robot.keyTap("j", [
-				// 	"shift",
-				// 	// process.platform === "darwin" ? "command" : "control" // Command on Mac, Control on Win
-				// 	"control"
-				// ]);
-				// robot.keyToggle("shift", "down");
-				// SnapCamera.TakePhoto();
-				await exec(path.resolve(__dirname, "../../bin/snapcamera")); // Execute binary produced from main.go in root.
+					// Resize the output file.
+					await sharp(snapOutputImage)
+						.extract({ width: 720, height: 720, top: 0, left: 0 })
+						.toFile(outputFile);
 
-				await delay(500);
+					// Clean the SnapOutput File
+					await del(snapOutputImage, { force: true });
 
-				const snapIndex = snapImages.length + i;
-				debugLogger(`Snap output image: ${snapIndex}`);
-				const snapOutputImage = path.join(
-					snapOutputDir,
-					`/Snap Camera Photo${snapIndex === 0 ? "" : ` ${snapIndex + 1}`}.jpg`
-				);
-				const outputFile = path.join(outputDir, path.basename(sourceImages[i]));
-
-				debugLogger(`Snap output image: ${snapOutputImage}`);
-
-				try {
-					await fs.access(snapOutputImage, fs.F_OK);
-				} catch (err) {
-					throw ono(err, `Cannot find file ${snapOutputImage}`);
-				}
-
-				// Resize the output file.
-				await sharp(snapOutputImage)
-					.extract({ width: 720, height: 720, top: 0, left: 0 })
-					.toFile(outputFile);
-
-				// Clean the SnapOutput File
-				await del(snapOutputImage, { force: true });
-
-				console.log(
-					`Successfully filtered image ${path.basename(sourceImages[i])}`
-				);
-			} catch (err) {
-				console.log(chalk.red(`Error! Could not process image`));
-				console.error(util.inspect(err, false, null, true));
+					return image;
+				})()
+					.then((resp) => {
+						done(null, resp);
+					})
+					.catch((err) => {
+						done(err);
+					});
+			},
+			{
+				batchDelay: 1000
 			}
-		}
+		);
+
+		// Queue the images for filtering.
+		sourceImages.forEach((image, i) => {
+			q.push({ image, i });
+		});
+
+		q.on("task_failed", (taskId, err) => {
+			console.log(chalk.red(`[${taskId}] Could not process image`));
+			console.error(util.inspect(err, false, null, true));
+		});
+
+		q.on("task_finish", (taskId, result) => {
+			console.log(`Successfully filtered image ${result}`);
+		});
+
+		await new Promise((resolve) => {
+			q.on("drain", () => {
+				resolve();
+			});
+		});
 
 		await obs.disconnect();
 		console.log(chalk.green(`All done!`));
