@@ -8,7 +8,7 @@ const path = require("path");
 // const { S3 } = require("aws-sdk");
 const fs = require("fs").promises;
 const chalk = require("chalk");
-const ono = require("ono");
+// const ono = require("ono");
 const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const util = require("util");
@@ -31,6 +31,8 @@ const delay = (timeout) =>
 			resolve();
 		}, timeout);
 	});
+
+sharp.cache(false);
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
