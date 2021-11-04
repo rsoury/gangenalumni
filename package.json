@@ -6,9 +6,6 @@
 	"author": "Ryan Soury",
 	"license": "UNLICENSED",
 	"private": true,
-	"engines": {
-		"node": ">=8.0.0 <=12.22.7"
-	},
 	"scripts": {
 		"filter": "node ./scripts/avatar-filter",
 		"generate": "node ./scripts/avatar-generator",
@@ -46,12 +43,15 @@
 		"commander": "^8.3.0",
 		"debug": "^4.3.2",
 		"del": "^6.0.0",
+		"envalid": "^7.2.2",
 		"glob": "^7.2.0",
 		"glob-promise": "^4.2.2",
+		"googleapis": "^89.0.0",
 		"is-numeric": "^0.0.9",
 		"mkdirp": "^1.0.4",
 		"obs-websocket-js": "^4.0.3",
 		"ono": "^7.1.3",
+		"readline-promise": "^1.0.5",
 		"sharp": "^0.29.2",
 		"user-agents": "^1.0.822"
 	}

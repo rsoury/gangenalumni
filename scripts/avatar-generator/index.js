@@ -1,3 +1,9 @@
+/**
+ * Step 1
+ *
+ * Generate the Human Avatars using GAN
+ */
+
 const path = require("path");
 const axios = require("axios");
 const axiosRetry = require("axios-retry");

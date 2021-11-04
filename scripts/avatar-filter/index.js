@@ -1,4 +1,7 @@
 /**
+ * Step 2
+ * Filter the Human Avatars using AI platform.
+ *
  * This script requires:
  * - OBS with a Scene that includes an Image Source named "Image"
  * - Snap Camera
