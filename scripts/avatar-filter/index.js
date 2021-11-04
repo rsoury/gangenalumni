@@ -13,10 +13,10 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const util = require("util");
 const OBSWebSocket = require("obs-websocket-js");
-const robot = require("robotjs"); // Requires Node 12
 const os = require("os");
 const sharp = require("sharp");
 const del = require("del");
+const { exec } = require("child-process-promise");
 const debugLogger = require("debug")("avatar-filter");
 
 const options = require("./options");
@@ -32,7 +32,7 @@ const delay = (timeout) =>
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
-const outputDir = path.resolve(__dirname, "../../output/step2");
+const outputDir = path.resolve(__dirname, `../../output/step2/${currentTs}`);
 
 // const s3Split = s3.replace("s3://", "").split("/");
 // const s3BucketName = s3Split.shift();
@@ -41,11 +41,9 @@ const outputDir = path.resolve(__dirname, "../../output/step2");
 
 let sourceImages = [];
 
-robot.setKeyboardDelay(100);
-
 if (!s3) {
 	// Create dir
-	mkdirp.sync(path.resolve(outputDir, `filtered--${currentTs}`));
+	mkdirp.sync(outputDir);
 
 	(async () => {
 		const stat = await fs.lstat(input);
@@ -57,22 +55,18 @@ if (!s3) {
 			sourceImages = await glob(`${input}/*`, { absolute: true });
 		}
 
-		console.log(sourceImages);
+		debugLogger(sourceImages);
 
 		// For each image
 		// 1. Set a OBS scene image source file.
-		// 2. Find Snap Camera window coordinates and bring to surface.
-		// 3. Execute Snap Camera using Robotjs
-		// 		RobotsJS only has functionality to move the cursor around.
-		// // 3. Remove the green screen background.
-		// 4. Resize the image programmatically to remove the excess background and produce a 720 × 720 -- https://github.com/lovell/sharp
+		// 2. Execute Snap Camera using Golang and RobotGO
+		// 3. Resize the image programmatically to remove the excess background and produce a 720 × 720 -- https://github.com/lovell/sharp
 
 		const obs = new OBSWebSocket();
 		await obs.connect({ password: "x5Wh98fTfUauQ9Ms" });
 		console.log(
 			chalk.green(`Success! We're connected & authenticated with OBS.`)
 		);
-		// TODO: Find Snap Camera window coordinates and bring to surface. -- Only needs to be done once.
 
 		const sourceName = `Image`;
 		const snapOutputDir = path.join(os.homedir(), "/Pictures");
@@ -102,15 +96,16 @@ if (!s3) {
 				// 	"control"
 				// ]);
 				// robot.keyToggle("shift", "down");
-				//! Robotjs is not compatible with Snap... or all keypress emulation scripts might not be. Find an alternative... maybe test a golang script.
+				// SnapCamera.TakePhoto();
+				await exec(path.resolve(__dirname, "../../bin/snapcamera")); // Execute binary produced from main.go in root.
 
-				await delay(2000);
+				await delay(500);
 
 				const snapIndex = snapImages.length + i;
 				debugLogger(`Snap output image: ${snapIndex}`);
 				const snapOutputImage = path.join(
 					snapOutputDir,
-					`/Snap Camera Photo${snapIndex === 0 ? "" : ` ${snapIndex}`}.jpg`
+					`/Snap Camera Photo${snapIndex === 0 ? "" : ` ${snapIndex + 1}`}.jpg`
 				);
 				const outputFile = path.join(outputDir, path.basename(sourceImages[i]));
 
@@ -123,10 +118,12 @@ if (!s3) {
 				}
 
 				// Resize the output file.
-				await sharp(snapOutputImage).resize(720).toFile(outputFile);
+				await sharp(snapOutputImage)
+					.extract({ width: 720, height: 720, top: 0, left: 0 })
+					.toFile(outputFile);
 
 				// Clean the SnapOutput File
-				await del(snapOutputImage);
+				await del(snapOutputImage, { force: true });
 
 				console.log(
 					`Successfully filtered image ${path.basename(sourceImages[i])}`

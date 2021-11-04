@@ -18,7 +18,7 @@ const userAgent = ua.toString();
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
-const outputDir = path.resolve(__dirname, "../../output/step1");
+const outputDir = path.resolve(__dirname, `../../output/step1/${currentTs}`);
 
 const s3Split = s3.replace("s3://", "").split("/");
 const s3BucketName = s3Split.shift();
@@ -39,7 +39,7 @@ axiosRetry(request, {
 
 if (!s3) {
 	// Create dir
-	mkdirp.sync(path.resolve(outputDir, `${currentTs}`));
+	mkdirp.sync(outputDir);
 }
 
 const q = new Queue(
@@ -75,7 +75,7 @@ const q = new Queue(
 				}
 
 				return fs.writeFile(
-					path.resolve(outputDir, `${currentTs}`, `${id}.jpeg`),
+					path.resolve(outputDir, `${id}.jpeg`),
 					base64,
 					"base64",
 					(err) => {
