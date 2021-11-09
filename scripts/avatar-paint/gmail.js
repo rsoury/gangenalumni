@@ -2,10 +2,16 @@ require("dotenv").config();
 
 const path = require("path");
 const fs = require("fs").promises;
-const readline = require("readline-promise");
+const { default: readline } = require("readline-promise");
 const { google } = require("googleapis");
 const mkdirp = require("mkdirp");
 const envalid = require("envalid");
+const _ = require("lodash");
+const interval = require("interval-promise");
+const debugLogger = require("debug")("avatar-paint");
+const cheerio = require("cheerio");
+
+const { inspectObject } = require("../utils");
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
@@ -36,9 +42,10 @@ async function getNewToken(oAuth2Client) {
 	console.log("Authorize this app by visiting this url:", authUrl);
 	const rl = readline.createInterface({
 		input: process.stdin,
-		output: process.stdout
+		output: process.stdout,
+		terminal: true
 	});
-	const code = await rl.question("Enter the code from that page here: ");
+	const code = await rl.questionAsync("Enter the code from that page here: ");
 	rl.close();
 
 	try {
@@ -83,40 +90,84 @@ async function authorize() {
 }
 
 /**
- * Lists the labels in the user's account.
+ * Fetch labels, and then isolate the email related to prisma auth.
  *
- * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
+ * @param   {Object}  auth  Google Auth
+ * @param   {Number}  offsetTs  Use offsetTime to ensure email comes after the login was executed.
+ *
+ * @return  {string}        Auth URL.
  */
-function listLabels(auth) {
+async function fetchPrismaAuth(auth, offsetTs) {
 	const gmail = google.gmail({ version: "v1", auth });
-	gmail.users.labels.list(
-		{
-			userId: "me"
-		},
-		(err, res) => {
-			if (err) {
-				return console.log("The API returned an error: " + err);
-			}
-			const { labels } = res.data;
-			if (labels.length) {
-				console.log("Labels:");
-				labels.forEach((label) => {
-					console.log(`- ${label.name}`);
-				});
-			} else {
-				console.log("No labels found.");
-			}
+	const getLatestMessage = async () => {
+		const response = await gmail.users.messages.list({
+			userId: "me",
+			maxResults: 1,
+			labelIds: "INBOX",
+			q: "from:noreply@prisma-ai.com subject:(Your Prisma verification code)"
+		});
+		return _.get(response, "data.messages[0]", {});
+	};
 
-			return null;
+	let message = await getLatestMessage();
+	if (!_.isEmpty(message)) {
+		message = await gmail.users.messages.get({
+			userId: "me",
+			id: message.id
+		});
+	}
+	debugLogger("immediate response");
+	debugLogger(inspectObject(message));
+	if (!_.isEmpty(message)) {
+		const messageTs = parseInt(message.data.internalDate, 10);
+		if (messageTs < offsetTs && offsetTs > 0) {
+			// Because the message timestamp is less than the offset timestamp, we're going to wait and listen for an incoming email.
+			interval(
+				async (i, done) => {
+					debugLogger(`Iteration ${i} ...`);
+					const newMessage = await getLatestMessage();
+					// Use response to check if it's the same message, otherwise check ts again.
+					if (!_.isEmpty(newMessage.id)) {
+						if (newMessage.id !== message.id) {
+							message = await gmail.users.messages.get({
+								userId: "me",
+								id: newMessage.id
+							});
+							debugLogger(`Iteration ${i} was a catch!`);
+							done();
+						}
+					}
+				},
+				5000,
+				{ iterations: 60 }
+			);
+
+			debugLogger("response after iterations");
+			debugLogger(inspectObject(message));
 		}
-	);
+	}
+
+	if (_.isEmpty(message)) {
+		debugLogger("no message response found");
+		return "";
+	}
+
+	// Process the message to extract the auth link
+	// 1. Base64 Decode the Body
+	// 2. Use Cheerio to extract the hyperlink in the auth button
+	const bodyData = _.get(message, "data.payload.parts[1].body.data", "");
+	const bodyHTML = Buffer.from(bodyData, "base64").toString("ascii");
+	const $ = cheerio.load(bodyHTML);
+	const authLink = $("a#button").attr("href");
+
+	if (!_.isEmpty(authLink)) {
+		return authLink;
+	}
+
+	return "";
 }
 
-async function fetchPrismaCode() {
-	// Authorize a client with credentials, then call the Gmail API.
-	const auth = await authorize();
-
-	return listLabels(auth);
-}
-
-module.exports = fetchPrismaCode;
+module.exports = {
+	authorize,
+	fetchPrismaAuth
+};

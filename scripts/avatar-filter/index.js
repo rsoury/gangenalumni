@@ -25,15 +25,9 @@ const chokidar = require("chokidar");
 const debugLogger = require("debug")("avatar-filter");
 
 const options = require("./options");
+const { delay } = require("../utils");
 
 const { input, s3 } = options;
-
-const delay = (timeout) =>
-	new Promise((resolve) => {
-		setTimeout(() => {
-			resolve();
-		}, timeout);
-	});
 
 sharp.cache(false);
 
@@ -87,7 +81,7 @@ if (!s3) {
 		debugLogger(`Snap output dir: ${snapOutputDir}`);
 
 		const q = new Queue(
-			({ image, i }, done) => {
+			({ image }, done) => {
 				(async () => {
 					// Set OBS image source file
 					await obs.send("SetSourceSettings", {

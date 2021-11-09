@@ -10,6 +10,10 @@ program.option(
 	"-i, --input <value>",
 	"The image or directory of images to use as an input"
 );
+program.option(
+	"-w, --with-ui",
+	"Option to show the browser during automation. Browser will run headlessly by default."
+);
 
 program.parse(process.argv);
 
