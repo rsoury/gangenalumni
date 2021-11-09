@@ -122,7 +122,7 @@ async function fetchPrismaAuth(auth, offsetTs) {
 		const messageTs = parseInt(message.data.internalDate, 10);
 		if (messageTs < offsetTs && offsetTs > 0) {
 			// Because the message timestamp is less than the offset timestamp, we're going to wait and listen for an incoming email.
-			interval(
+			await interval(
 				async (i, done) => {
 					debugLogger(`Iteration ${i} ...`);
 					const newMessage = await getLatestMessage();
@@ -133,7 +133,7 @@ async function fetchPrismaAuth(auth, offsetTs) {
 								userId: "me",
 								id: newMessage.id
 							});
-							debugLogger(`Iteration ${i} was a catch!`);
+							debugLogger(`Iteration ${i} is a catch!`);
 							done();
 						}
 					}

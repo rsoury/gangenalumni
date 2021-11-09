@@ -16,6 +16,7 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const Queue = require("better-queue");
 const debugLogger = require("debug")("avatar-paint");
+// const puppeteer = require("puppeteer");
 
 const options = require("./options");
 const gmail = require("./gmail");
@@ -23,11 +24,6 @@ const puppeteer = require("./crawler");
 const { inspectObject } = require("../utils");
 
 const { input, s3, withUi } = options;
-
-let headless = true;
-if (!withUi) {
-	headless = !withUi;
-}
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
@@ -54,52 +50,75 @@ if (!s3) {
 			sourceImages = await glob(`${input}/*`, { absolute: true });
 		}
 
-		debugLogger(sourceImages);
+		// debugLogger(sourceImages);
 
 		// For each image
 		// 1. Process through Prisma AI web interface -- use Puppeteer
 
 		// Initiate gmail auth here
 		const gauth = await gmail.authorize();
-		const pauthUrl = await gmail.fetchPrismaAuth(gauth);
-		debugLogger(`Auth URL: ${pauthUrl}`);
 
 		// Initiate pupeteer here.
 		// Log into Prisma
-		// const browser = await puppeteer.launch({ headless });
-		// const page = await browser.newPage();
-		// await page.goto("https://app.prisma-ai.com/");
-		// // Wait for modal... if shows, close it.
-		// try {
-		// 	await page.waitForSelector(
-		// 		`body > div.sc-iCfLBT.cyKWiF.sc-lcequs.gYrNUP > div > div > button`,
-		// 		{ timeout: 5000 }
-		// 	);
-		// 	await page.click(
-		// 		`body > div.sc-iCfLBT.cyKWiF.sc-lcequs.gYrNUP > div > div > button`
-		// 	);
-		// } catch (err) {
-		// 	console.log(chalk.grey("No modal to close"));
-		// }
-		// // Look for Sign In button
-		// await page.click(`#root > div > div.sc-dkYRiW.zAgBi > div > button`);
-		// await page.waitForSelector(
-		// 	`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > div > div > div.sc-dPiKHq.jtMGgR > input`,
-		// 	{ timeout: 10000 }
-		// );
-		// await page.type(
-		// 	`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > div > div > div.sc-dPiKHq.jtMGgR > input`,
-		// 	"ryan@webdoodle.com.au"
-		// );
-		// await page.click(
-		// 	`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > button`
-		// );
+		const browser = await puppeteer.launch({
+			headless: typeof withUi === "undefined" ? true : !withUi
+		});
+		const page = await browser.newPage();
+		await page.goto("https://app.prisma-ai.com/");
+		// Wait for modal... if shows, close it.
 
-		// // Wait for code input modal to show
-		// await page.waitForSelector(`#field-0`, { timeout: 30000 });
+		try {
+			await page.waitForSelector(
+				`body > div.sc-iCfLBT.cyKWiF.sc-lcequs.gYrNUP > div > div > button`,
+				{ timeout: 5000 }
+			);
+			await page.click(
+				`body > div.sc-iCfLBT.cyKWiF.sc-lcequs.gYrNUP > div > div > button`
+			);
+		} catch (err) {
+			console.log(chalk.grey("No modal to close"));
+		}
+		// Look for Sign In button
+		await page.waitForSelector(
+			`#root > div > div.sc-dkYRiW.zAgBi > div > button`,
+			{ timeout: 5000 }
+		);
+		await page.click(`#root > div > div.sc-dkYRiW.zAgBi > div > button`);
+		await page.waitForSelector(
+			`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > div > div > div.sc-dPiKHq.jtMGgR > input`,
+			{ timeout: 10000 }
+		);
+		await page.type(
+			`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > div > div > div.sc-dPiKHq.jtMGgR > input`,
+			"ryan@webdoodle.com.au"
+		);
+
+		// Save the timestamp for when the Sign In Button is clicked
+		const signInTs = Date.now();
+		await page.click(
+			`body > div.sc-iCfLBT.iWHGVD > div > div > div.sc-hiCivh.iUXnyj > form > button`
+		);
+
+		// Wait for code input modal to show
+		await page.waitForSelector(`#field-0`, { timeout: 30000 });
 
 		// Listen to gmail for new email from prisma
+		const pauthUrl = await gmail.fetchPrismaAuth(gauth, signInTs);
+		if (!pauthUrl) {
+			throw new Error("Cannot authorise with Prisma");
+		}
+		debugLogger(`Auth URL: ${pauthUrl}`);
 
+		// Go to the authorisation URL
+		await page.goto(pauthUrl, { waitUntil: "domcontentloaded" });
+
+		// Wait for the Profile Menu Item
+		await page.waitForSelector(
+			"#root > div > div.sc-dkYRiW.zAgBi > div > button.eRoEXR",
+			{ timeout: 30000 }
+		); // Wait for Profile "Secondary" Button
+
+		// Proceed with the Batch Image Processing
 		// const q = new Queue(
 		// 	({ image }, done) => {
 		// 		(async () => {
@@ -136,6 +155,9 @@ if (!s3) {
 		// 		resolve();
 		// 	});
 		// });
+
+		// await page.close();
+		// await browser.close();
 
 		console.log(chalk.green(`All done!`));
 	})();
