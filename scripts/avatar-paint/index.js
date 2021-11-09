@@ -16,7 +16,7 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const Queue = require("better-queue");
 const debugLogger = require("debug")("avatar-paint");
-// const puppeteer = require("puppeteer");
+const interval = require("interval-promise");
 
 const options = require("./options");
 const gmail = require("./gmail");
@@ -119,42 +119,106 @@ if (!s3) {
 		); // Wait for Profile "Secondary" Button
 
 		// Proceed with the Batch Image Processing
-		// const q = new Queue(
-		// 	({ image }, done) => {
-		// 		(async () => {
-		// 			return image;
-		// 		})()
-		// 			.then((resp) => {
-		// 				done(null, resp);
-		// 			})
-		// 			.catch((err) => {
-		// 				done(err);
-		// 			});
-		// 	},
-		// 	{
-		// 		batchDelay: 1000
-		// 	}
+		// await page.click('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-bUbQrF.vQGyo > div.sc-djWQLY.QinlX > button')
+		// await page.waitForTimeout(2000)
+		// await page.type('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-bUbQrF.vQGyo > div.sc-djWQLY.QinlX > input', 'Melody')
+		// await page.click('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-jlsrtQ.sc-hYQoDq.jTBRdI.fTqTJk > div > div.sc-cHzrye.kKMDjV > div')
+		const [melodyCellElement] = await page.$x(
+			`//div[contains(text(), 'Melody')]`
+		);
+
+		const imageUploadElement = await page.$(
+			"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-iFMAoI.dnQAZn > div.sc-FNZbm.kGBuQP > input[type=file]"
+		);
+		// const imageUploadButton = await page.$(
+		// 	"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-iFMAoI.dnQAZn > div.sc-FNZbm.kGBuQP > button"
 		// );
+		await page._client.send("Page.setDownloadBehavior", {
+			behavior: "allow",
+			downloadPath: outputDir
+		});
+		// Overlay: #root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-kTLnJg.dYLStF > div
+		const q = new Queue(
+			({ image }, done) => {
+				(async () => {
+					// https://dev.to/sonyarianto/practical-puppeteer-how-to-upload-a-file-programatically-4nm4 -- Great article on how to manage file uploads in Pptr
+					// Upload image
+					imageUploadElement.uploadFile(image);
+					// await imageUploadButton.click(); // Click on button to trigger the upload
+					// Wait for image upload
+					await interval(
+						async (i, doneInterval) => {
+							try {
+								debugLogger(`Waiting for upload image - second ${i}`);
+								await page.waitForSelector(
+									"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div.sc-jtXFOG.hSrftO",
+									{ timeout: 1000 }
+								);
+							} catch (e) {
+								debugLogger(`Image uploaded`);
+								doneInterval();
+							}
+						},
+						1100,
+						{ interations: 60 }
+					);
+					// Click on Melody
+					await melodyCellElement.click();
+					// Wait for paint/filter process
+					await interval(
+						async (i, doneInterval) => {
+							try {
+								debugLogger(`Waiting for image paint - second ${i}`);
+								await page.waitForSelector(
+									"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-kTLnJg.dYLStF > div",
+									{ timeout: 1000 }
+								);
+							} catch (e) {
+								debugLogger(`Image painted`);
+								doneInterval();
+							}
+						},
+						1100,
+						{ interations: 60 }
+					);
+					// Download the painted image to the output dir -- https://www.scrapingbee.com/blog/download-file-puppeteer/
+					await page.click(
+						"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-iFMAoI.dnQAZn > div.sc-iqVVwt.dWaGix > button"
+					);
 
-		// // Queue the images for filtering.
-		// sourceImages.forEach((image, i) => {
-		// 	q.push({ image, i });
-		// });
+					return image;
+				})()
+					.then((resp) => {
+						done(null, resp);
+					})
+					.catch((err) => {
+						done(err);
+					});
+			},
+			{
+				batchDelay: 200
+			}
+		);
 
-		// q.on("task_failed", (taskId, err) => {
-		// 	console.log(chalk.red(`[${taskId}] Could not process image`));
-		// 	console.error(inspectObject(err));
-		// });
+		// Queue the images for filtering.
+		sourceImages.forEach((image, i) => {
+			q.push({ image, i });
+		});
 
-		// q.on("task_finish", (taskId, result) => {
-		// 	console.log(`Successfully painted image ${result}`);
-		// });
+		q.on("task_failed", (taskId, err) => {
+			console.log(chalk.red(`[${taskId}] Could not process image`));
+			console.error(inspectObject(err));
+		});
 
-		// await new Promise((resolve) => {
-		// 	q.on("drain", () => {
-		// 		resolve();
-		// 	});
-		// });
+		q.on("task_finish", (taskId, result) => {
+			console.log(`Successfully painted image ${result}`);
+		});
+
+		await new Promise((resolve) => {
+			q.on("drain", () => {
+				resolve();
+			});
+		});
 
 		// await page.close();
 		// await browser.close();
