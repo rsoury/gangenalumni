@@ -14,6 +14,7 @@ const UserAgent = require("user-agents");
 const chalk = require("chalk");
 const ono = require("ono");
 const mkdirp = require("mkdirp");
+const debugLog = require("debug")("avatar-generate");
 
 const options = require("./options");
 
@@ -25,6 +26,8 @@ const userAgent = ua.toString();
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
 const outputDir = path.resolve(__dirname, `../../output/step1/${currentTs}`);
+
+debugLog(`Output Directory: ${outputDir}`);
 
 const s3Split = s3.replace("s3://", "").split("/");
 const s3BucketName = s3Split.shift();
@@ -123,3 +126,15 @@ q.on("drain", () => {
 for (let i = 1; i < number + 1; i += 1) {
 	q.push(i);
 }
+
+(async () => {
+	await fs.writeFile(
+		path.join(outputDir, "info.json"),
+		JSON.stringify({
+			script: "filter",
+			ts: currentTs,
+			output: outputDir,
+			count: number
+		})
+	);
+})();

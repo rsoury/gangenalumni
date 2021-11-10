@@ -22,7 +22,7 @@ const del = require("del");
 const { exec } = require("child-process-promise");
 const Queue = require("better-queue");
 const chokidar = require("chokidar");
-const debugLogger = require("debug")("avatar-filter");
+const debugLog = require("debug")("avatar-filter");
 
 const options = require("./options");
 const { delay } = require("../utils");
@@ -34,6 +34,8 @@ sharp.cache(false);
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
 const outputDir = path.resolve(__dirname, `../../output/step2/${currentTs}`);
+
+debugLog(`Output Directory: ${outputDir}`);
 
 // const s3Split = s3.replace("s3://", "").split("/");
 // const s3BucketName = s3Split.shift();
@@ -56,7 +58,7 @@ if (!s3) {
 			sourceImages = await glob(`${input}/*`, { absolute: true });
 		}
 
-		debugLogger(sourceImages);
+		debugLog(sourceImages);
 
 		// For each image
 		// 1. Set a OBS scene image source file.
@@ -76,9 +78,9 @@ if (!s3) {
 			path.join(snapOutputDir, `/Snap Camera Photo*`),
 			{ absolute: true }
 		);
-		debugLogger(`platform: ${process.platform}`);
-		debugLogger(`homedir: ${os.homedir()}`);
-		debugLogger(`Snap output dir: ${snapOutputDir}`);
+		debugLog(`platform: ${process.platform}`);
+		debugLog(`homedir: ${os.homedir()}`);
+		debugLog(`Snap output dir: ${snapOutputDir}`);
 
 		const q = new Queue(
 			({ image }, done) => {
@@ -102,7 +104,7 @@ if (!s3) {
 					const snapOutputImage = path.join(snapOutputDir, snapOutputFilename);
 					const outputFile = path.join(outputDir, path.basename(image));
 
-					debugLogger(`Snap output image: ${snapOutputImage}`);
+					debugLog(`Snap output image: ${snapOutputImage}`);
 
 					await delay(500); // Buffer for the image creation...
 
@@ -173,6 +175,18 @@ if (!s3) {
 		});
 
 		await obs.disconnect();
+
+		await fs.writeFile(
+			path.join(outputDir, "info.json"),
+			JSON.stringify({
+				script: "filter",
+				ts: currentTs,
+				source: input,
+				output: outputDir,
+				count: sourceImages.length
+			})
+		);
+
 		console.log(chalk.green(`All done!`));
 	})();
 }

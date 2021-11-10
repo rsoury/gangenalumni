@@ -53,6 +53,7 @@
 		"is-numeric": "^0.0.9",
 		"lodash": "^4.17.21",
 		"mkdirp": "^1.0.4",
+		"ncp": "^2.0.0",
 		"obs-websocket-js": "^4.0.3",
 		"ono": "^7.1.3",
 		"puppeteer": "^11.0.0",

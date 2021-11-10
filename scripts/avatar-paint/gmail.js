@@ -8,7 +8,7 @@ const mkdirp = require("mkdirp");
 const envalid = require("envalid");
 const _ = require("lodash");
 const interval = require("interval-promise");
-const debugLogger = require("debug")("avatar-paint");
+const debugLog = require("debug")("avatar-paint");
 const cheerio = require("cheerio");
 
 const { inspectObject } = require("../utils");
@@ -116,15 +116,15 @@ async function fetchPrismaAuth(auth, offsetTs) {
 			id: message.id
 		});
 	}
-	debugLogger("immediate response");
-	debugLogger(inspectObject(message));
+	debugLog("immediate response");
+	debugLog(inspectObject(message));
 	if (!_.isEmpty(message)) {
 		const messageTs = parseInt(message.data.internalDate, 10);
 		if (messageTs < offsetTs && offsetTs > 0) {
 			// Because the message timestamp is less than the offset timestamp, we're going to wait and listen for an incoming email.
 			await interval(
 				async (i, done) => {
-					debugLogger(`Iteration ${i} ...`);
+					debugLog(`Iteration ${i} ...`);
 					const newMessage = await getLatestMessage();
 					// Use response to check if it's the same message, otherwise check ts again.
 					if (!_.isEmpty(newMessage.id)) {
@@ -133,7 +133,7 @@ async function fetchPrismaAuth(auth, offsetTs) {
 								userId: "me",
 								id: newMessage.id
 							});
-							debugLogger(`Iteration ${i} is a catch!`);
+							debugLog(`Iteration ${i} is a catch!`);
 							done();
 						}
 					}
@@ -142,13 +142,13 @@ async function fetchPrismaAuth(auth, offsetTs) {
 				{ iterations: 60 }
 			);
 
-			debugLogger("response after iterations");
-			debugLogger(inspectObject(message));
+			debugLog("response after iterations");
+			debugLog(inspectObject(message));
 		}
 	}
 
 	if (_.isEmpty(message)) {
-		debugLogger("no message response found");
+		debugLog("no message response found");
 		return "";
 	}
 

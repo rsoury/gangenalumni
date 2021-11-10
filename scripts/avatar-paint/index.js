@@ -15,19 +15,24 @@ const chalk = require("chalk");
 const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const Queue = require("better-queue");
-const debugLogger = require("debug")("avatar-paint");
+const debugLog = require("debug")("avatar-paint");
 const interval = require("interval-promise");
+const del = require("del");
+const util = require("util");
+const ncp = util.promisify(require("ncp"));
 
 const options = require("./options");
 const gmail = require("./gmail");
 const puppeteer = require("./crawler");
-const { inspectObject } = require("../utils");
+const { inspectObject, delay } = require("../utils");
 
 const { input, s3, withUi } = options;
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
 const outputDir = path.resolve(__dirname, `../../output/step3/${currentTs}`);
+
+debugLog(`Output Directory: ${outputDir}`);
 
 // const s3Split = s3.replace("s3://", "").split("/");
 // const s3BucketName = s3Split.shift();
@@ -50,7 +55,7 @@ if (!s3) {
 			sourceImages = await glob(`${input}/*`, { absolute: true });
 		}
 
-		// debugLogger(sourceImages);
+		// debugLog(sourceImages);
 
 		// For each image
 		// 1. Process through Prisma AI web interface -- use Puppeteer
@@ -107,7 +112,7 @@ if (!s3) {
 		if (!pauthUrl) {
 			throw new Error("Cannot authorise with Prisma");
 		}
-		debugLogger(`Auth URL: ${pauthUrl}`);
+		debugLog(`Auth URL: ${pauthUrl}`);
 
 		// Go to the authorisation URL
 		await page.goto(pauthUrl, { waitUntil: "domcontentloaded" });
@@ -119,13 +124,51 @@ if (!s3) {
 		); // Wait for Profile "Secondary" Button
 
 		// Proceed with the Batch Image Processing
-		// await page.click('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-bUbQrF.vQGyo > div.sc-djWQLY.QinlX > button')
-		// await page.waitForTimeout(2000)
-		// await page.type('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-bUbQrF.vQGyo > div.sc-djWQLY.QinlX > input', 'Melody')
-		// await page.click('#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-bGaWHc.kjAuoY.fHoPRO > div > div.sc-jlsrtQ.sc-hYQoDq.jTBRdI.fTqTJk > div > div.sc-cHzrye.kKMDjV > div')
 		const [melodyCellElement] = await page.$x(
 			`//div[contains(text(), 'Melody')]`
 		);
+
+		const waitForPaint = () =>
+			interval(
+				async (i, doneInterval) => {
+					try {
+						debugLog(`Waiting for image paint - second ${i}`);
+						await page.waitForSelector(
+							"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-kTLnJg.dYLStF > div",
+							{ timeout: 1000, visible: true }
+						);
+					} catch (e) {
+						debugLog(`Image painted`);
+						doneInterval();
+					}
+				},
+				1100,
+				{ iterations: 60 }
+			);
+
+		const waitForUpload = () =>
+			interval(
+				async (i, doneInterval) => {
+					try {
+						debugLog(`Waiting for upload image - second ${i}`);
+						await page.waitForSelector(
+							"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div.sc-jtXFOG.hSrftO",
+							{ timeout: 1000, visible: true }
+						);
+					} catch (e) {
+						debugLog(`Image uploaded`);
+						doneInterval();
+					}
+				},
+				1100,
+				{ iterations: 60 }
+			);
+
+		// Click on Melody
+		await melodyCellElement.click();
+		// Wait for paint/filter process
+		await waitForPaint();
+		//* This process will add a default image to the App so that the ImageUploadElement can be found correctly
 
 		const imageUploadElement = await page.$(
 			"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-iFMAoI.dnQAZn > div.sc-FNZbm.kGBuQP > input[type=file]"
@@ -138,6 +181,7 @@ if (!s3) {
 			downloadPath: outputDir
 		});
 		// Overlay: #root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-kTLnJg.dYLStF > div
+
 		const q = new Queue(
 			({ image }, done) => {
 				(async () => {
@@ -146,47 +190,32 @@ if (!s3) {
 					imageUploadElement.uploadFile(image);
 					// await imageUploadButton.click(); // Click on button to trigger the upload
 					// Wait for image upload
-					await interval(
-						async (i, doneInterval) => {
-							try {
-								debugLogger(`Waiting for upload image - second ${i}`);
-								await page.waitForSelector(
-									"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div.sc-jtXFOG.hSrftO",
-									{ timeout: 1000 }
-								);
-							} catch (e) {
-								debugLogger(`Image uploaded`);
-								doneInterval();
-							}
-						},
-						1100,
-						{ interations: 60 }
-					);
+					await waitForUpload();
 					// Click on Melody
 					await melodyCellElement.click();
 					// Wait for paint/filter process
-					await interval(
-						async (i, doneInterval) => {
-							try {
-								debugLogger(`Waiting for image paint - second ${i}`);
-								await page.waitForSelector(
-									"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-kTLnJg.dYLStF > div",
-									{ timeout: 1000 }
-								);
-							} catch (e) {
-								debugLogger(`Image painted`);
-								doneInterval();
-							}
-						},
-						1100,
-						{ interations: 60 }
-					);
+					await waitForPaint();
 					// Download the painted image to the output dir -- https://www.scrapingbee.com/blog/download-file-puppeteer/
 					await page.click(
 						"#root > div > div.sc-cjrQaZ.bkqtbz > div > div.sc-gXRoDt.sc-fydGIT.kjAuoY.dUrBNr > div > div > div.sc-iFMAoI.dnQAZn > div.sc-iqVVwt.dWaGix > button"
 					);
 
-					return image;
+					// Rename the file.
+					await delay(500);
+					const filename = path.basename(image);
+					const filenamePieces = filename.split(".");
+					// const filenameExt =
+					filenamePieces.pop();
+					const filenameNoExt = filenamePieces.join(".");
+					const resultFile = path.join(
+						outputDir,
+						`${filenameNoExt}_prisma_melody.jpg`
+					);
+					const newFile = path.join(outputDir, `${filenameNoExt}.jpg`);
+					await ncp(resultFile, newFile);
+					await del(resultFile);
+
+					return { source: image, result: newFile };
 				})()
 					.then((resp) => {
 						done(null, resp);
@@ -211,7 +240,10 @@ if (!s3) {
 		});
 
 		q.on("task_finish", (taskId, result) => {
-			console.log(`Successfully painted image ${result}`);
+			console.log(
+				chalk.green(`[${taskId}] Successfully painted image`),
+				result
+			);
 		});
 
 		await new Promise((resolve) => {
@@ -220,8 +252,19 @@ if (!s3) {
 			});
 		});
 
-		// await page.close();
-		// await browser.close();
+		await page.close();
+		await browser.close();
+
+		await fs.writeFile(
+			path.join(outputDir, "info.json"),
+			JSON.stringify({
+				script: "paint",
+				ts: currentTs,
+				source: input,
+				output: outputDir,
+				count: sourceImages.length
+			})
+		);
 
 		console.log(chalk.green(`All done!`));
 	})();
