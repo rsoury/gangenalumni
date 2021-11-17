@@ -55,7 +55,9 @@ if (!s3) {
 			sourceImages.push(path.resolve(input));
 		} else {
 			// Get images from directory
-			sourceImages = await glob(`${input}/*`, { absolute: true });
+			sourceImages = await glob(`${input}/*.{jpeg,jpg,png}`, {
+				absolute: true
+			});
 		}
 
 		debugLog(sourceImages);

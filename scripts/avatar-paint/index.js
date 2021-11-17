@@ -52,7 +52,9 @@ if (!s3) {
 			sourceImages.push(path.resolve(input));
 		} else {
 			// Get images from directory
-			sourceImages = await glob(`${input}/*`, { absolute: true });
+			sourceImages = await glob(`${input}/*.{jpeg,jpg,png}`, {
+				absolute: true
+			});
 		}
 
 		// debugLog(sourceImages);
@@ -123,9 +125,12 @@ if (!s3) {
 			{ timeout: 30000 }
 		); // Wait for Profile "Secondary" Button
 
+		// Set Filter Name
+		const filterName = `Melody`;
+
 		// Proceed with the Batch Image Processing
-		const [melodyCellElement] = await page.$x(
-			`//div[contains(text(), 'Melody')]`
+		const [filterCellElement] = await page.$x(
+			`//div[contains(text(), '${filterName}')]`
 		);
 
 		const waitForPaint = () =>
@@ -164,8 +169,8 @@ if (!s3) {
 				{ iterations: 60 }
 			);
 
-		// Click on Melody
-		await melodyCellElement.click();
+		// Click on Filter Cell -- ie. Melody
+		await filterCellElement.click();
 		// Wait for paint/filter process
 		await waitForPaint();
 		//* This process will add a default image to the App so that the ImageUploadElement can be found correctly
@@ -191,8 +196,8 @@ if (!s3) {
 					// await imageUploadButton.click(); // Click on button to trigger the upload
 					// Wait for image upload
 					await waitForUpload();
-					// Click on Melody
-					await melodyCellElement.click();
+					// Click on Filter Cell -- ie. Melody
+					await filterCellElement.click();
 					// Wait for paint/filter process
 					await waitForPaint();
 					// Download the painted image to the output dir -- https://www.scrapingbee.com/blog/download-file-puppeteer/
@@ -209,7 +214,7 @@ if (!s3) {
 					const filenameNoExt = filenamePieces.join(".");
 					const resultFile = path.join(
 						outputDir,
-						`${filenameNoExt}_prisma_melody.jpg`
+						`${filenameNoExt}_prisma_${filterName.toLowerCase()}.jpg`
 					);
 					const newFile = path.join(outputDir, `${filenameNoExt}.jpg`);
 					await ncp(resultFile, newFile);
