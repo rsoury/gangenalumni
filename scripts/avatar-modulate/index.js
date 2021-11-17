@@ -57,7 +57,7 @@ if (!s3) {
 
 					// Modulate the file.
 					await sharp(image)
-						.modulate({ hue: 10, saturation: 1.3 })
+						.modulate({ hue: 10, saturation: 1.2 })
 						.toFile(outputFile);
 
 					return image;
