@@ -12,8 +12,11 @@ const util = require("util");
 const sharp = require("sharp");
 const Queue = require("better-queue");
 const debugLog = require("debug")("avatar-accessorise");
+const sizeOf = require("image-size");
 
 const options = require("../options")();
+
+const awsFrData = require("../../tmp/46-aws-fr.json");
 
 const { input, s3 } = options;
 
@@ -54,6 +57,20 @@ if (!s3) {
 			({ image }, done) => {
 				(async () => {
 					const outputFile = path.join(outputDir, path.basename(image));
+					const compositeImage = path.resolve(
+						__dirname,
+						"../../stickers/cigarette.png"
+					); // x: 342 , y: 334
+					// TODO: Abstract the stickers.js file to set as constant the entry coordinates and the file path
+					const dimensions = await sizeOf(image);
+
+					const mouthCoords =
+						// Accessories the input image.
+						await sharp(image)
+							.composite({
+								input: compositeImage
+							})
+							.toFile(outputFile);
 
 					return image;
 				})()
