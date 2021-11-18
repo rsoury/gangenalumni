@@ -24,7 +24,7 @@ const Queue = require("better-queue");
 const chokidar = require("chokidar");
 const debugLog = require("debug")("avatar-filter");
 
-const options = require("./options");
+const options = require("../options")();
 const { delay } = require("../utils");
 
 const { input, s3 } = options;

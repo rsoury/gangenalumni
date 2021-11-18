@@ -1,6 +1,6 @@
 /**
- * Step 4
- * Modulate the Human Avatars using Sharp (Node.js)
+ * Step 2.5 -- An optional step
+ * Accessorise the Human Avatars
  */
 
 const path = require("path");
@@ -11,7 +11,7 @@ const glob = require("glob-promise");
 const util = require("util");
 const sharp = require("sharp");
 const Queue = require("better-queue");
-const debugLog = require("debug")("avatar-modulate");
+const debugLog = require("debug")("avatar-accessorise");
 
 const options = require("../options")();
 
@@ -21,7 +21,7 @@ sharp.cache(false);
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
-const outputDir = path.resolve(__dirname, `../../output/step4/${currentTs}`);
+const outputDir = path.resolve(__dirname, `../../output/step2.5/${currentTs}`);
 
 debugLog(`Output Directory: ${outputDir}`);
 
@@ -54,11 +54,6 @@ if (!s3) {
 			({ image }, done) => {
 				(async () => {
 					const outputFile = path.join(outputDir, path.basename(image));
-
-					// Modulate the file.
-					await sharp(image)
-						.modulate({ hue: 10, saturation: 1.2 })
-						.toFile(outputFile);
 
 					return image;
 				})()
@@ -97,7 +92,7 @@ if (!s3) {
 		await fs.writeFile(
 			path.join(outputDir, "info.json"),
 			JSON.stringify({
-				script: "modulate",
+				script: "accessorise",
 				ts: currentTs,
 				source: input,
 				output: outputDir,

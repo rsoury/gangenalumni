@@ -21,7 +21,7 @@ const del = require("del");
 const util = require("util");
 const ncp = util.promisify(require("ncp"));
 
-const options = require("./options");
+const options = require("../options")(["browser"]);
 const gmail = require("./gmail");
 const puppeteer = require("./crawler");
 const { inspectObject, delay } = require("../utils");
