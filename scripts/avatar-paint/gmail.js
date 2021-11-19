@@ -152,12 +152,12 @@ async function fetchPrismaAuth(auth, offsetTs) {
 		return "";
 	}
 
-	// Mark message as read
-	await gmail.users.messages.modify({
-		userId: "me",
-		id: message.data.id,
-		removeLabelIds: ["UNREAD"]
-	});
+	// // Mark message as read
+	// await gmail.users.messages.modify({
+	// 	userId: "me",
+	// 	id: message.data.id,
+	// 	removeLabelIds: ["UNREAD"]
+	// });
 
 	// Process the message to extract the auth link
 	// 1. Base64 Decode the Body

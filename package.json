@@ -54,6 +54,7 @@
 		"image-size": "^1.0.0",
 		"interval-promise": "^1.4.0",
 		"is-numeric": "^0.0.9",
+		"jsonfile": "^6.1.0",
 		"lodash": "^4.17.21",
 		"mkdirp": "^1.0.4",
 		"ncp": "^2.0.0",
