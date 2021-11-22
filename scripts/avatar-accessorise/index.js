@@ -18,7 +18,6 @@ const _ = require("lodash");
 const Queue = require("../queue");
 const options = require("../options")();
 const stickers = require("./stickers");
-const { queueHandler } = require("../utils");
 
 const { input, s3 } = options;
 
@@ -40,6 +39,7 @@ let sourceImages = [];
 const accessoryProbability = [
 	{
 		name: "cigarette",
+		type: "mouth",
 		// value: 0.1
 		value: 1 // 100% for testing purposes.
 	}
@@ -63,10 +63,6 @@ if (!s3) {
 
 		debugLog(sourceImages);
 
-		// const editQueue = new Queue(async ({  }, done) => {
-
-		// });
-
 		const q = new Queue(
 			async ({ image }) => {
 				const outputFile = path.join(outputDir, path.basename(image));
@@ -78,7 +74,12 @@ if (!s3) {
 				);
 				const awsFrData = await jsonfile.readFile(awsFrFilepath);
 
-				const noseLandmark = _.get(awsFrData, "FaceDetails.Landmarks", []).find(
+				const facialLandmarks = _.get(
+					awsFrData,
+					"FaceDetails[0].Landmarks",
+					[]
+				);
+				const noseLandmark = facialLandmarks.find(
 					({ Type: type }) => type === "nose"
 				);
 				if (_.isEmpty(noseLandmark)) {
@@ -92,16 +93,62 @@ if (!s3) {
 					? stickers.faceLeft
 					: stickers.faceRight;
 
-				// Check mouth open before adding any mouth accessories -- ie. cigarette or vape.
+				// // Check mouth open before adding any mouth accessories -- ie. cigarette or vape.
+				// const mouthOpen = _.get(awsFrData, "FaceDetails.MouthOpen", {})
+				// if (_.isEmpty(mouthOpen)) {
+				// 	throw new Error(
+				// 		`Cannot find the Mouth Open prediction for image ${image} - ${awsFrFilepath}`
+				// 	);
+				// }
+				// if(!mouthOpen.Value){
+				// 	return;
+				// }
+
 				// Then get the mouth landmark to determine the coordinates
+				const mouthBottomLandmark = facialLandmarks.find(
+					({ Type: type }) => type === "mouthDown"
+				);
+				if (_.isEmpty(mouthBottomLandmark)) {
+					throw new Error(
+						`Cannot find the Mouth Bottom Landmark for image ${image} - ${awsFrFilepath}`
+					);
+				}
+				const mouthTopLandmark = facialLandmarks.find(
+					({ Type: type }) => type === "mouthUp"
+				);
+				if (_.isEmpty(mouthTopLandmark)) {
+					throw new Error(
+						`Cannot find the Mouth Top Landmark for image ${image} - ${awsFrFilepath}`
+					);
+				}
+				const mouthBottomCoords = {
+					x: mouthBottomLandmark.X * dimensions.width,
+					y: mouthBottomLandmark.Y * dimensions.height
+				};
+				const mouthTopCoords = {
+					x: mouthTopLandmark.X * dimensions.width,
+					y: mouthTopLandmark.Y * dimensions.height
+				};
+				// Deduce center of mouth coords -- or just below the top of the mouth
+				const mouthCoords = {
+					x:
+						mouthTopCoords.x +
+						((mouthBottomCoords.x - mouthTopCoords.x) / 8) * 5,
+					y:
+						mouthTopCoords.y +
+						((mouthBottomCoords.y - mouthTopCoords.y) / 8) * 5
+				};
+				debugLog({ mouthCoords });
 				// Then queue the image composite edit
-				// const mouthCoords =	{ x: noseLandmark.X * dimensions.width, y: noseLandmark.Y * dimensions.height }
-				// Accessories the input image.
-				// await sharp(image)
-				// 	.composite({
-				// 		input: compositeImage
-				// 	})
-				// 	.toFile(outputFile);
+				await sharp(image)
+					.composite([
+						{
+							input: stickersToUse.cigarette.path,
+							left: Math.round(mouthCoords.x - stickersToUse.cigarette.x),
+							top: Math.round(mouthCoords.y - stickersToUse.cigarette.y)
+						}
+					])
+					.toFile(outputFile);
 
 				return image;
 			},

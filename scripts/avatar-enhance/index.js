@@ -11,7 +11,7 @@ const glob = require("glob-promise");
 const util = require("util");
 const sharp = require("sharp");
 const Queue = require("better-queue");
-const debugLog = require("debug")("avatar-accessorise");
+const debugLog = require("debug")("avatar-enhance");
 const sizeOf = require("image-size");
 
 const options = require("../options")();
