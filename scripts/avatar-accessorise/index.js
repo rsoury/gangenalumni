@@ -36,12 +36,12 @@ debugLog(`Output Directory: ${outputDir}`);
 
 let sourceImages = [];
 
-const accessoryProbability = [
+const accessories = [
 	{
 		name: "cigarette",
 		type: "mouth",
-		// value: 0.1
-		value: 1 // 100% for testing purposes.
+		// probability: 0.1
+		probability: 1 // 100% for testing purposes.
 	}
 ];
 
@@ -62,6 +62,8 @@ if (!s3) {
 		}
 
 		debugLog(sourceImages);
+
+		const accessoriesAdded = {};
 
 		const q = new Queue(
 			async ({ image }) => {
@@ -139,16 +141,51 @@ if (!s3) {
 						((mouthBottomCoords.y - mouthTopCoords.y) / 8) * 5
 				};
 				debugLog({ mouthCoords });
-				// Then queue the image composite edit
-				await sharp(image)
-					.composite([
-						{
-							input: stickersToUse.cigarette.path,
-							left: Math.round(mouthCoords.x - stickersToUse.cigarette.x),
-							top: Math.round(mouthCoords.y - stickersToUse.cigarette.y)
+
+				const compositeSettings = [];
+				accessories.forEach((accessory) => {
+					// Only add accessory if meets 10% chance and there is not pre-existing accessory of that type.
+					if (
+						_.isUndefined(
+							compositeSettings.find(({ type }) => type === accessory.type)
+						)
+					) {
+						const addAccessory = Math.random() < accessory.probability;
+						if (addAccessory) {
+							let settings = {};
+							switch (accessory.type) {
+								case "mouth": {
+									settings = {
+										left: Math.round(
+											mouthCoords.x - stickersToUse[accessory.name].x
+										),
+										top: Math.round(
+											mouthCoords.y - stickersToUse[accessory.name].y
+										)
+									};
+									break;
+								}
+								default: {
+									break;
+								}
+							}
+							if (!_.isEmpty(settings)) {
+								compositeSettings.push({
+									input: stickersToUse[accessory.name].path,
+									...settings
+								});
+
+								if (_.isUndefined(accessoriesAdded[filename])) {
+									accessoriesAdded[filename] = [];
+								}
+								accessoriesAdded[filename].push(accessory.name);
+							}
 						}
-					])
-					.toFile(outputFile);
+					}
+				});
+
+				// Then queue the image composite edit
+				await sharp(image).composite(compositeSettings).toFile(outputFile);
 
 				return image;
 			},
@@ -177,7 +214,6 @@ if (!s3) {
 			});
 		});
 
-		// TODO: We're going to have to include the data around which image receivied which accessories to enhance the NFT metadata
 		await fs.writeFile(
 			path.join(outputDir, "info.json"),
 			JSON.stringify({
@@ -185,7 +221,8 @@ if (!s3) {
 				ts: currentTs,
 				source: input,
 				output: outputDir,
-				count: sourceImages.length
+				count: sourceImages.length,
+				accessoriesAdded
 			})
 		);
 
