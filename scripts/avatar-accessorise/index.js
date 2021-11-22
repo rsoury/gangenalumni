@@ -214,17 +214,14 @@ if (!s3) {
 			});
 		});
 
-		await fs.writeFile(
-			path.join(outputDir, "info.json"),
-			JSON.stringify({
-				script: "accessorise",
-				ts: currentTs,
-				source: input,
-				output: outputDir,
-				count: sourceImages.length,
-				accessoriesAdded
-			})
-		);
+		await jsonfile.writeFile(path.join(outputDir, "info.json"), {
+			script: "accessorise",
+			ts: currentTs,
+			source: input,
+			output: outputDir,
+			count: sourceImages.length,
+			accessoriesAdded
+		});
 
 		console.log(chalk.green(`All done!`));
 	})();
