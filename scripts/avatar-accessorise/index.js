@@ -36,12 +36,34 @@ debugLog(`Output Directory: ${outputDir}`);
 
 let sourceImages = [];
 
+// TODO: Include some checks -- such as age -- before adding a cigarette/vape.
+// TODO: Give an elevation metric to each image -- such that a cigarette/vape sits above a chin bandaid.
 const accessories = [
 	{
 		name: "cigarette",
 		type: "mouth",
 		// probability: 0.1
 		probability: 1 // 100% for testing purposes.
+	},
+	{
+		name: "vape",
+		type: "mouth",
+		probability: 0.05
+	},
+	{
+		name: "tattoo-1",
+		type: "mouth",
+		probability: 0.05
+	},
+	{
+		name: "tattoo-2",
+		type: "mouth",
+		probability: 0.05
+	},
+	{
+		name: "bandaid",
+		type: "mouth",
+		probability: 0.025
 	}
 ];
 
