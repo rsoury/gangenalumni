@@ -96,6 +96,7 @@ mkdirp.sync(outputDir);
 				if (availableLocations.length === 0) {
 					return;
 				}
+
 				const selectedLocation =
 					availableLocations[
 						Math.floor(Math.random() * availableLocations.length)
@@ -109,6 +110,9 @@ mkdirp.sync(outputDir);
 				let settings = {};
 				const sticker = accessory.sticker[stickerDirection];
 				let featureCoords = {};
+				// TODO: Decide what to do if we have an avatar that is only showing one side of their face predominantly -- 28.jpg is a perfect example.
+				//* We can use the Roll, Pitch and Yaw metrics to potentially determine which locations to blacklist
+				// https://www.researchgate.net/figure/The-head-pose-rotation-angles-Yaw-is-the-rotation-around-the-Y-axis-Pitch-around-the_fig1_281587953#:~:text=Yaw%20is%20the%20rotation%20around%20the%20Y%2Daxis.,-Pitch%20around%20the
 				switch (selectedLocation) {
 					case "mouth": {
 						featureCoords = coords.forMouth();
@@ -139,19 +143,25 @@ mkdirp.sync(outputDir);
 						break;
 					}
 					case "forehead-right": {
+						return; // TESTING
+						/* eslint-disable */
 						featureCoords = coords.forForeheadRight();
 						break;
 					}
 					case "forehead-left": {
+						return; // TESTING
 						featureCoords = coords.forForeheadLeft();
 						break;
 					}
 					case "neck-right": {
+						return; // TESTING
 						featureCoords = coords.forNeckRight();
 						break;
 					}
 					case "neck-left": {
+						return; // TESTING
 						featureCoords = coords.forNeckLeft();
+						/* eslint-enable */
 						break;
 					}
 					default: {
