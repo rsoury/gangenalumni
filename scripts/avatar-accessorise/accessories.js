@@ -41,6 +41,36 @@ const produceCenterSticker = async (sticker) =>
 		  };
 
 const getAccessories = async () => {
+	const noseScarLeftPath = path.join(
+		__dirname,
+		"../../assets/scar-nose-left.png"
+	);
+	const noseScarRightPath = path.join(
+		__dirname,
+		"../../assets/scar-nose-right.png"
+	);
+	const noseScarLeftDimensions = await sizeOf(noseScarLeftPath);
+	const noseScarRightDimensions = await sizeOf(noseScarRightPath);
+	const noseScar = {
+		name: "nose-scar",
+		probability: 0.025,
+		sticker: {
+			left: {
+				x: noseScarLeftDimensions.width / 2,
+				y: noseScarLeftDimensions.height,
+				path: noseScarLeftPath
+			},
+			right: {
+				x: noseScarRightDimensions.width / 2,
+				y: noseScarRightDimensions.height,
+				path: noseScarRightPath
+			}
+		},
+		locations: ["nose"],
+		elevate: 1,
+		directionBy: "pose"
+	};
+
 	return [
 		{
 			name: "cigarette",
@@ -80,31 +110,21 @@ const getAccessories = async () => {
 			elevate: 10,
 			directionBy: "pose"
 		},
-		{
-			name: "nose-scar",
-			probability: 0.025,
-			sticker: {
-				left: await produceSticker(
-					path.join(__dirname, "../../assets/scar-nose-left.png")
-				),
-				right: await produceSticker(
-					path.join(__dirname, "../../assets/scar-nose-right.png")
-				)
-			},
-			locations: ["nose"],
-			elevate: 1,
-			directionBy: "pose"
-		},
+		noseScar,
 		{
 			name: "eye-scar",
 			probability: 0.025,
 			sticker: {
-				left: await produceSticker(
-					path.join(__dirname, "../../assets/scar-eye-left.png")
-				),
-				right: await produceSticker(
-					path.join(__dirname, "../../assets/scar-eye-right.png")
-				)
+				left: {
+					x: 0,
+					y: 20,
+					path: path.join(__dirname, "../../assets/scar-eye-left.png")
+				},
+				right: {
+					x: 0,
+					y: 20,
+					path: path.join(__dirname, "../../assets/scar-eye-right.png")
+				}
 			},
 			locations: ["eye-left", "eye-right"],
 			elevate: 1,
@@ -200,15 +220,7 @@ const getAccessories = async () => {
 			sticker: await produceCenterSticker(
 				path.join(__dirname, "../../assets/tattoo-4.png")
 			),
-			locations: [
-				"glabella",
-				"eye-left",
-				"eye-right",
-				"forehead-left",
-				"forehead-right",
-				"cheek-left",
-				"cheek-right"
-			],
+			locations: ["glabella", "cheek-left", "cheek-right"],
 			elevate: 1,
 			directionBy: "pose"
 		},
@@ -264,6 +276,21 @@ const getAccessories = async () => {
 			name: "chin-bandaid",
 			probability: 0.025,
 			sticker: {
+				// left: {
+				// 	x: -10,
+				// 	y: 0,
+				// 	path: path.join(__dirname, "../../assets/bandaid-chin-left.png")
+				// },
+				// right: {
+				// 	x:
+				// 		(
+				// 			await sizeOf(
+				// 				path.join(__dirname, "../../assets/bandaid-chin-right.png")
+				// 			)
+				// 		).width + 10,
+				// 	y: 0,
+				// 	path: path.join(__dirname, "../../assets/bandaid-chin-right.png")
+				// }
 				left: await produceSticker(
 					path.join(__dirname, "../../assets/bandaid-chin-left.png")
 				),

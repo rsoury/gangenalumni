@@ -5,23 +5,19 @@ const getCoords = async (image, awsFacialData) => {
 	const dimensions = await sizeOf(image);
 	const facialLandmarks = _.get(awsFacialData, "FaceDetails[0].Landmarks", []);
 
+	const getLandmark = (t) => {
+		const landmark = facialLandmarks.find(({ Type: type }) => type === t);
+		if (_.isEmpty(landmark)) {
+			throw new Error(`Cannot find the ${t} Landmark for image ${image}`);
+		}
+		return landmark;
+	};
+
 	return {
 		forMouth() {
 			// Then get the mouth landmark to determine the coordinates
-			const mouthBottomLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "mouthDown"
-			);
-			if (_.isEmpty(mouthBottomLandmark)) {
-				throw new Error(
-					`Cannot find the mouthDown Landmark for image ${image}`
-				);
-			}
-			const mouthTopLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "mouthUp"
-			);
-			if (_.isEmpty(mouthTopLandmark)) {
-				throw new Error(`Cannot find the mouthUp Landmark for image ${image}`);
-			}
+			const mouthBottomLandmark = getLandmark("mouthDown");
+			const mouthTopLandmark = getLandmark("mouthUp");
 			const mouthBottomCoords = {
 				x: mouthBottomLandmark.X * dimensions.width,
 				y: mouthBottomLandmark.Y * dimensions.height
@@ -41,38 +37,30 @@ const getCoords = async (image, awsFacialData) => {
 		},
 		forNose() {
 			// Then get the mouth landmark to determine the coordinates
-			const noseLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "nose"
-			);
-			if (_.isEmpty(noseLandmark)) {
-				throw new Error(`Cannot find the Nose Landmark for image ${image}`);
-			}
+			const noseLandmark = getLandmark("nose");
 			const noseTipCoords = {
 				x: noseLandmark.X * dimensions.width,
 				y: noseLandmark.Y * dimensions.height
 			};
 
-			// // Deduce nose bridge coords by referring to the X coordinates of the facial eyes.
 			return noseTipCoords;
 		},
 		forGlabella() {
-			// Get the center of the leftEyeBrowRight and rightEyeBrowLeft
-			const leftLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "leftEyeBrowRight"
-			);
-			if (_.isEmpty(leftLandmark)) {
-				throw new Error(
-					`Cannot find the leftEyeBrowRight Landmark for image ${image}`
-				);
-			}
-			const rightLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "rightEyeBrowLeft"
-			);
-			if (_.isEmpty(rightLandmark)) {
-				throw new Error(
-					`Cannot find the rightEyeBrowLeft Landmark for image ${image}`
-				);
-			}
+			// Get the center of the first points leftEyeBrowRight, rightEyeBrowLeft, eyeRight, eyeLeft
+			const browLeftLandmark = getLandmark("leftEyeBrowRight");
+			const browRightLandmark = getLandmark("rightEyeBrowLeft");
+			const eyeLeftLandmark = getLandmark("eyeLeft");
+			const eyeRightLandmark = getLandmark("eyeRight");
+
+			const leftLandmark = {
+				Y: eyeLeftLandmark.Y + (browLeftLandmark.Y - eyeLeftLandmark.Y) / 2,
+				X: eyeLeftLandmark.X + (browLeftLandmark.X - eyeLeftLandmark.X) / 2
+			};
+			const rightLandmark = {
+				Y: eyeRightLandmark.Y + (browRightLandmark.Y - eyeRightLandmark.Y) / 2,
+				X: eyeRightLandmark.X + (browRightLandmark.X - eyeRightLandmark.X) / 2
+			};
+
 			const leftCoords = {
 				x: leftLandmark.X * dimensions.width,
 				y: leftLandmark.Y * dimensions.height
@@ -97,48 +85,47 @@ const getCoords = async (image, awsFacialData) => {
 		},
 		forEyeRight() {
 			// Get coords of the bottom & center of the right eye
-			const landmark = facialLandmarks.find(
-				({ Type: type }) => type === "rightEyeDown"
-			);
-			if (_.isEmpty(landmark)) {
-				throw new Error(
-					`Cannot find the rightEyeDown Landmark for image ${image}`
-				);
-			}
+			const { Y } = getLandmark("rightEyeDown");
+			const { X } = getLandmark("rightEyeRight");
+			const landmark = {
+				X,
+				Y
+			};
+
 			const coords = {
 				x: landmark.X * dimensions.width,
-				y: landmark.Y * dimensions.height
+				y: landmark.Y * dimensions.height + 40
 			};
 
 			return coords;
 		},
 		forEyeLeft() {
 			// Get coords of the bottom & center of the left eye
-			const landmark = facialLandmarks.find(
-				({ Type: type }) => type === "leftEyeDown"
-			);
-			if (_.isEmpty(landmark)) {
-				throw new Error(
-					`Cannot find the leftEyeDown Landmark for image ${image}`
-				);
-			}
+			// Add a buffer because of large eyes
+			const { Y } = getLandmark("leftEyeDown");
+			const { X } = getLandmark("leftEyeLeft");
+			const landmark = {
+				X,
+				Y
+			};
+
 			const coords = {
 				x: landmark.X * dimensions.width,
-				y: landmark.Y * dimensions.height
+				y: landmark.Y * dimensions.height + 40
 			};
 
 			return coords;
 		},
 		forChinRight() {
-			// Use midJawlineRight to determine the coords
-			const landmark = facialLandmarks.find(
-				({ Type: type }) => type === "midJawlineRight"
-			);
-			if (_.isEmpty(landmark)) {
-				throw new Error(
-					`Cannot find the midJawlineRight Landmark for image ${image}`
-				);
-			}
+			// Use the center between midJawlineRight, mouthRight to determine the coords
+			const jawlineLandmark = getLandmark("midJawlineRight");
+			const mouthLandmark = getLandmark("mouthRight");
+
+			const landmark = {
+				X: jawlineLandmark.X + (mouthLandmark.X - jawlineLandmark.X) / 2,
+				Y: jawlineLandmark.Y + (mouthLandmark.Y - jawlineLandmark.Y) / 2
+			};
+
 			const coords = {
 				x: landmark.X * dimensions.width,
 				y: landmark.Y * dimensions.height
@@ -147,15 +134,15 @@ const getCoords = async (image, awsFacialData) => {
 			return coords;
 		},
 		forChinLeft() {
-			// Use midJawlineLeft to determine the coords
-			const landmark = facialLandmarks.find(
-				({ Type: type }) => type === "midJawlineLeft"
-			);
-			if (_.isEmpty(landmark)) {
-				throw new Error(
-					`Cannot find the midJawlineLeft Landmark for image ${image}`
-				);
-			}
+			// Use the center between midJawlineLeft, mouthLeft to determine the coords
+			const jawlineLandmark = getLandmark("midJawlineLeft");
+			const mouthLandmark = getLandmark("mouthLeft");
+
+			const landmark = {
+				X: jawlineLandmark.X + ((mouthLandmark.X - jawlineLandmark.X) / 8) * 5,
+				Y: jawlineLandmark.Y + ((mouthLandmark.Y - jawlineLandmark.Y) / 8) * 5
+			};
+
 			const coords = {
 				x: landmark.X * dimensions.width,
 				y: landmark.Y * dimensions.height

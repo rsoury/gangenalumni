@@ -19,7 +19,6 @@ const indicateLandmarks = async (image, awsFacialData) => {
 		debugLog({ type: landmark.Type, color });
 
 		return {
-			// input: indicatorBuffer,
 			input: {
 				create: {
 					width: 10,
@@ -28,14 +27,9 @@ const indicateLandmarks = async (image, awsFacialData) => {
 					background: color
 				}
 			},
-			// raw: {
-			// 	width,
-			// 	height,
-			// 	channels: 3
-			// },
-			gravity: "centre", // Seems to be the approach at placing the image -- which is to use it's "centre"
-			left: Math.round(dimensions.width * landmark.X), // Math.round(dimensions.width * landmark.X - indicatorRadius),
-			top: Math.round(dimensions.height * landmark.Y) // Math.round(dimensions.height * landmark.Y - indicatorRadius)
+			left: Math.round(dimensions.width * landmark.X - 5),
+			top: Math.round(dimensions.height * landmark.Y - 5),
+			blend: "add"
 		};
 	});
 };
