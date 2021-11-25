@@ -42,7 +42,7 @@ const getCoords = async (image, awsFacialData) => {
 		forNose() {
 			// Then get the mouth landmark to determine the coordinates
 			const noseLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "mouthDown"
+				({ Type: type }) => type === "nose"
 			);
 			if (_.isEmpty(noseLandmark)) {
 				throw new Error(`Cannot find the Nose Landmark for image ${image}`);

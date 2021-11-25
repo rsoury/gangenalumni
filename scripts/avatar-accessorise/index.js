@@ -16,11 +16,21 @@ const _ = require("lodash");
 const clone = require("deep-clone");
 
 const Queue = require("../queue");
-const options = require("../options")();
+const options = require("../options")((program) => {
+	program.option(
+		"--all-options",
+		"Flag to remove the probability/chance checks."
+	);
+	program.option(
+		"--indicate",
+		"Flag to indicate with markers where each of the landmarks are on the avatar."
+	);
+});
 const getCoords = require("./coords");
 const getAccessories = require("./accessories");
+const { inspectObject } = require("../utils");
 
-const { input } = options;
+const { input, allOptions } = options;
 
 sharp.cache(false);
 
@@ -64,17 +74,35 @@ mkdirp.sync(outputDir);
 			const awsFrData = await jsonfile.readFile(awsFrFilepath);
 
 			// 2. Identify which way the avatar is facing
-			const facialLandmarks = _.get(awsFrData, "FaceDetails[0].Landmarks", []);
-			const noseLandmark = facialLandmarks.find(
-				({ Type: type }) => type === "nose"
-			);
-			if (_.isEmpty(noseLandmark)) {
+			//* Use the Roll, Pitch and Yaw metrics to potentially determine which locations to blacklist
+			// https://www.researchgate.net/figure/The-head-pose-rotation-angles-Yaw-is-the-rotation-around-the-Y-axis-Pitch-around-the_fig1_281587953#:~:text=Yaw%20is%20the%20rotation%20around%20the%20Y%2Daxis.,-Pitch%20around%20the
+			const yaw = _.get(awsFrData, "FaceDetails[0].Pose.Yaw");
+			if (_.isUndefined(yaw)) {
 				throw new Error(
-					`Cannot find the Nose Landmark for image ${image} - ${awsFrFilepath}`
+					`Cannot find the Yaw for image ${image} - ${awsFrFilepath}`
 				);
 			}
-			const isFacingLeft = noseLandmark.X < 0.5;
-			const stickerDirection = isFacingLeft ? "left" : "right";
+			const isFacingLeft = yaw < 0;
+			const allLocations = accessories.reduce((accumulator, currentValue) => {
+				currentValue.locations.forEach((location) => {
+					if (!accumulator.includes(location)) {
+						accumulator.push(location);
+					}
+				});
+				return accumulator;
+			}, []);
+			let blacklistedLocations = [];
+			if (yaw > 15) {
+				// Facing super to the right -- blacklist all "-left" locations
+				blacklistedLocations = allLocations.map(
+					(location) => !location.includes("-left")
+				);
+			} else if (yaw < -15) {
+				// Facing super to the left -- blacklist all "-right" locations
+				blacklistedLocations = allLocations.map(
+					(location) => !location.includes("-right")
+				);
+			}
 
 			const coords = await getCoords(image, awsFrData);
 
@@ -89,7 +117,10 @@ mkdirp.sync(outputDir);
 				const filledLocations = composite.map(({ location }) => location); // array of filled locations.
 				const availableLocations = [];
 				accessory.locations.forEach((location) => {
-					if (!filledLocations.includes(location)) {
+					if (
+						!filledLocations.includes(location) &&
+						!blacklistedLocations.includes(location)
+					) {
 						availableLocations.push(location);
 					}
 				});
@@ -97,22 +128,41 @@ mkdirp.sync(outputDir);
 					return;
 				}
 
+				// Random location selection
 				const selectedLocation =
 					availableLocations[
 						Math.floor(Math.random() * availableLocations.length)
 					];
 
-				const addAccessory = Math.random() < accessory.probability;
+				// Some sticker directions are determined by the pose, others by symmetry -- symmetry means that the sticker should look the same regardless of pose, but depending on which side of the face it is being used.
+				const stickerDirection = (
+					accessory.directionBy === "pose"
+						? isFacingLeft
+						: selectedLocation.includes("-left")
+				)
+					? "left"
+					: "right";
+
+				const addAccessory =
+					allOptions || Math.random() < accessory.probability;
 				if (!addAccessory) {
 					return;
 				}
 
-				let settings = {};
+				debugLog(
+					inspectObject({
+						// accessory: accessory.name,
+						accessory,
+						addAccessory,
+						selectedLocation,
+						availableLocations,
+						blacklistedLocations,
+						filledLocations
+					})
+				);
+
 				const sticker = accessory.sticker[stickerDirection];
 				let featureCoords = {};
-				// TODO: Decide what to do if we have an avatar that is only showing one side of their face predominantly -- 28.jpg is a perfect example.
-				//* We can use the Roll, Pitch and Yaw metrics to potentially determine which locations to blacklist
-				// https://www.researchgate.net/figure/The-head-pose-rotation-angles-Yaw-is-the-rotation-around-the-Y-axis-Pitch-around-the_fig1_281587953#:~:text=Yaw%20is%20the%20rotation%20around%20the%20Y%2Daxis.,-Pitch%20around%20the
 				switch (selectedLocation) {
 					case "mouth": {
 						featureCoords = coords.forMouth();
@@ -170,26 +220,29 @@ mkdirp.sync(outputDir);
 				}
 
 				if (_.isEmpty(featureCoords)) {
-					debugLog({ selectedLocation, featureCoords });
-					settings = {
-						left: Math.round(featureCoords.x - sticker.x),
-						top: Math.round(featureCoords.y - sticker.y)
-					};
 					return;
 				}
 
+				// TODO: Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
+				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
+				// Skin can be observed by taking the pigment from the cheek on the same side that the avatar is facing.
+
+				debugLog({ featureCoords, sticker });
+
 				composite.push({
+					location: selectedLocation,
 					accessory,
 					settings: {
 						input: sticker.path,
-						...settings
+						left: Math.round(featureCoords.x - sticker.x),
+						top: Math.round(featureCoords.y - sticker.y)
 					}
 				});
 
 				if (_.isUndefined(accessoriesAdded[filename])) {
-					accessoriesAdded[filename] = [];
+					accessoriesAdded[filename] = {};
 				}
-				accessoriesAdded[filename].push(accessory.name);
+				accessoriesAdded[filename][selectedLocation] = accessory.name;
 			});
 
 			// Then queue the image composite edit -- // Only pass the array of settings to Sharp

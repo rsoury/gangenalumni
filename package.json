@@ -40,6 +40,7 @@
 		"axios": "^0.24.0",
 		"axios-retry": "^3.2.4",
 		"better-queue": "^3.8.10",
+		"canvas": "^2.8.0",
 		"chalk": "^4.1.2",
 		"cheerio": "^1.0.0-rc.10",
 		"child-process-promise": "^2.2.1",
@@ -67,6 +68,7 @@
 		"puppeteer-extra-plugin-anonymize-ua": "^2.3.3",
 		"puppeteer-extra-plugin-stealth": "^2.9.0",
 		"puppeteer-extra-plugin-user-data-dir": "^2.3.1",
+		"randomcolor": "^0.6.2",
 		"readline-promise": "^1.0.5",
 		"sharp": "^0.29.2",
 		"user-agents": "^1.0.822"

@@ -28,13 +28,13 @@ const getCenterEntryCoords = async (imagePath) => {
 // eg. Used for nose score
 const produceSticker = async (imagePath) => ({
 	path: imagePath,
-	...getCenterEntryCoords(imagePath)
+	...(await getCenterEntryCoords(imagePath))
 });
 
 // eg. Used for tattoos
 const produceCenterSticker = async (sticker) =>
 	typeof sticker === "string"
-		? produceCenterSticker(produceSticker(sticker))
+		? produceCenterSticker(await produceSticker(sticker))
 		: {
 				left: sticker,
 				right: sticker
@@ -58,7 +58,8 @@ const getAccessories = async () => {
 				}
 			},
 			locations: ["mouth"],
-			elevate: 10
+			elevate: 10,
+			directionBy: "pose"
 		},
 		{
 			name: "vape",
@@ -66,17 +67,18 @@ const getAccessories = async () => {
 			sticker: {
 				left: {
 					x: 135,
-					y: 135,
+					y: 10,
 					path: path.join(__dirname, "../../assets/vape-left.png")
 				},
 				right: {
-					x: 6,
-					y: 135,
+					x: 12,
+					y: 10,
 					path: path.join(__dirname, "../../assets/vape-right.png")
 				}
 			},
 			locations: ["mouth"],
-			elevate: 10
+			elevate: 10,
+			directionBy: "pose"
 		},
 		{
 			name: "nose-scar",
@@ -90,7 +92,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["nose"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "eye-scar",
@@ -104,7 +107,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["eye-left", "eye-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "forehead-scar",
@@ -118,7 +122,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["forehead-left", "forehead-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "forehead-scar-2",
@@ -132,7 +137,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["forehead-left", "forehead-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "tattoo-1",
@@ -149,7 +155,8 @@ const getAccessories = async () => {
 				"cheek-left",
 				"cheek-right"
 			],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "tattoo-2",
@@ -166,7 +173,8 @@ const getAccessories = async () => {
 				"cheek-left",
 				"cheek-right"
 			],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "tattoo-3",
@@ -183,7 +191,8 @@ const getAccessories = async () => {
 				"cheek-left",
 				"cheek-right"
 			],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "tattoo-music-note",
@@ -200,7 +209,8 @@ const getAccessories = async () => {
 				"cheek-left",
 				"cheek-right"
 			],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "tattoo-smiley",
@@ -217,7 +227,8 @@ const getAccessories = async () => {
 				"cheek-left",
 				"cheek-right"
 			],
-			elevate: 1
+			elevate: 1,
+			directionBy: "pose"
 		},
 		{
 			name: "neck-cross-tattoo",
@@ -231,7 +242,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["neck-left", "neck-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "neck-dragon-tattoo",
@@ -245,7 +257,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["neck-left", "neck-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "chin-bandaid",
@@ -259,7 +272,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["chin-left", "chin-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "bandaid",
@@ -273,7 +287,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		},
 		{
 			name: "evil-bandaid",
@@ -287,7 +302,8 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
-			elevate: 1
+			elevate: 1,
+			directionBy: "symmetry"
 		}
 	];
 };

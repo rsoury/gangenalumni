@@ -2,7 +2,7 @@ const { Command } = require("commander");
 
 const program = new Command();
 
-const getOptions = (features = []) => {
+const getOptions = (scriptSpecificOptions = () => {}) => {
 	program.option(
 		"-s, --s3 <value>",
 		"Bucket and location to use to store avatars in s3."
@@ -12,12 +12,7 @@ const getOptions = (features = []) => {
 		"The image or directory of images to use as an input"
 	);
 
-	if (features.includes("browser")) {
-		program.option(
-			"-w, --with-ui",
-			"Option to show the browser during automation. Browser will run headlessly by default."
-		);
-	}
+	scriptSpecificOptions(program);
 
 	program.parse(process.argv);
 

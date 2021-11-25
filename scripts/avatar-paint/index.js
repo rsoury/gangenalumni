@@ -21,7 +21,12 @@ const del = require("del");
 const util = require("util");
 const ncp = util.promisify(require("ncp"));
 
-const options = require("../options")(["browser"]);
+const options = require("../options")((program) => {
+	program.option(
+		"-w, --with-ui",
+		"Option to show the browser during automation. Browser will run headlessly by default."
+	);
+});
 const gmail = require("./gmail");
 const puppeteer = require("./crawler");
 const { inspectObject, delay } = require("../utils");
