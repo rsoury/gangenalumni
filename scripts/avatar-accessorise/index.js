@@ -194,25 +194,19 @@ mkdirp.sync(outputDir);
 						break;
 					}
 					case "forehead-right": {
-						return; // TESTING
-						/* eslint-disable */
 						featureCoords = coords.forForeheadRight();
 						break;
 					}
 					case "forehead-left": {
-						return; // TESTING
 						featureCoords = coords.forForeheadLeft();
 						break;
 					}
 					case "neck-right": {
-						return; // TESTING
 						featureCoords = coords.forNeckRight();
 						break;
 					}
 					case "neck-left": {
-						return; // TESTING
 						featureCoords = coords.forNeckLeft();
-						/* eslint-enable */
 						break;
 					}
 					default: {
@@ -245,6 +239,8 @@ mkdirp.sync(outputDir);
 				}
 				accessoriesAdded[filename][selectedLocation] = accessory.name;
 			});
+
+			// TODO: Sort the composite elements by the accessory elevate value in ascending order -- this way highest elevate value is added last.
 
 			// Then queue the image composite edit -- // Only pass the array of settings to Sharp
 			await sharp(image)

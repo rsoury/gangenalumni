@@ -14,6 +14,8 @@
  ]
  */
 
+//! These accessory images are designed for a 720x720 avatar
+
 const path = require("path");
 const sizeOf = require("image-size");
 

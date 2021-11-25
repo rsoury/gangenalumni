@@ -89,12 +89,12 @@ const getCoords = async (image, awsFacialData) => {
 			const { X } = getLandmark("rightEyeRight");
 			const landmark = {
 				X,
-				Y
+				Y: Y + 0.06
 			};
 
 			const coords = {
 				x: landmark.X * dimensions.width,
-				y: landmark.Y * dimensions.height + 40
+				y: landmark.Y * dimensions.height
 			};
 
 			return coords;
@@ -106,12 +106,12 @@ const getCoords = async (image, awsFacialData) => {
 			const { X } = getLandmark("leftEyeLeft");
 			const landmark = {
 				X,
-				Y
+				Y: Y + 0.06
 			};
 
 			const coords = {
 				x: landmark.X * dimensions.width,
-				y: landmark.Y * dimensions.height + 40
+				y: landmark.Y * dimensions.height
 			};
 
 			return coords;
@@ -154,15 +154,13 @@ const getCoords = async (image, awsFacialData) => {
 			// Use the rightEyeBrowRight landmark to determine the furthest right part of the face
 			// Then use the bottom of the image as the entry point.
 			// Add a buffer/padding to move the image above the eyebrow and inward.
+			const { Y } = getLandmark("rightEyeBrowUp");
+			const { X } = getLandmark("rightEyeRight");
+			const landmark = {
+				X,
+				Y: Y - 0.138
+			};
 
-			const landmark = facialLandmarks.find(
-				({ Type: type }) => type === "rightEyeBrowRight"
-			);
-			if (_.isEmpty(landmark)) {
-				throw new Error(
-					`Cannot find the rightEyeBrowRight Landmark for image ${image}`
-				);
-			}
 			const coords = {
 				x: landmark.X * dimensions.width,
 				y: landmark.Y * dimensions.height
@@ -171,13 +169,49 @@ const getCoords = async (image, awsFacialData) => {
 			return coords;
 		},
 		forForeheadLeft() {
-			return {};
+			const { Y } = getLandmark("leftEyeBrowUp");
+			const { X } = getLandmark("leftEyeLeft");
+			const landmark = {
+				X,
+				Y: Y - 0.138
+			};
+
+			const coords = {
+				x: landmark.X * dimensions.width,
+				y: landmark.Y * dimensions.height
+			};
+
+			return coords;
 		},
 		forNeckRight() {
-			return {};
+			const { Y } = getLandmark("chinBottom");
+			const { X } = getLandmark("mouthRight");
+			const landmark = {
+				X,
+				Y
+			};
+
+			const coords = {
+				x: landmark.X * dimensions.width,
+				y: landmark.Y * dimensions.height
+			};
+
+			return coords;
 		},
 		forNeckLeft() {
-			return {};
+			const { Y } = getLandmark("chinBottom");
+			const { X } = getLandmark("mouthLeft");
+			const landmark = {
+				X,
+				Y
+			};
+
+			const coords = {
+				x: landmark.X * dimensions.width,
+				y: landmark.Y * dimensions.height
+			};
+
+			return coords;
 		}
 	};
 };
