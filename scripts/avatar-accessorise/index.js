@@ -34,7 +34,6 @@ const addLandmarkIndicators = require("./indicate");
 const { input, allOptions, indicate } = options;
 
 sharp.cache(false);
-console.log(sharp.format);
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();

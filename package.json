@@ -40,7 +40,6 @@
 		"axios": "^0.24.0",
 		"axios-retry": "^3.2.4",
 		"better-queue": "^3.8.10",
-		"canvas": "^2.8.0",
 		"chalk": "^4.1.2",
 		"cheerio": "^1.0.0-rc.10",
 		"child-process-promise": "^2.2.1",

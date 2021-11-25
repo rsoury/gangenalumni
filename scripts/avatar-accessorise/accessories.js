@@ -66,12 +66,12 @@ const getAccessories = async () => {
 			probability: 0.1,
 			sticker: {
 				left: {
-					x: 135,
+					x: 70,
 					y: 10,
 					path: path.join(__dirname, "../../assets/vape-left.png")
 				},
 				right: {
-					x: 12,
+					x: 15,
 					y: 10,
 					path: path.join(__dirname, "../../assets/vape-right.png")
 				}
