@@ -29,10 +29,12 @@ const options = require("../options")((program) => {
 const getCoords = require("./coords");
 const getAccessories = require("./accessories");
 const { inspectObject } = require("../utils");
+const addLandmarkIndicators = require("./indicate");
 
-const { input, allOptions } = options;
+const { input, allOptions, indicate } = options;
 
 sharp.cache(false);
+console.log(sharp.format);
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
@@ -247,7 +249,13 @@ mkdirp.sync(outputDir);
 
 			// Then queue the image composite edit -- // Only pass the array of settings to Sharp
 			await sharp(image)
-				.composite(composite.map(({ settings }) => settings))
+				.composite(
+					composite
+						.map(({ settings }) => settings)
+						.concat(
+							indicate ? await addLandmarkIndicators(image, awsFrData) : []
+						)
+				)
 				.toFile(outputFile);
 
 			return image;
