@@ -240,7 +240,18 @@ mkdirp.sync(outputDir);
 				accessoriesAdded[filename][selectedLocation] = accessory.name;
 			});
 
-			// TODO: Sort the composite elements by the accessory elevate value in ascending order -- this way highest elevate value is added last.
+			// Sort the composite elements by the accessory elevate value in ascending order -- this way highest elevate value is added last.
+			composite.sort(
+				(
+					{ accessory: { elevate: elevate1 } },
+					{ accessory: { elevate: elevate2 } }
+				) => {
+					return elevate1 - elevate2;
+				}
+			);
+			debugLog(
+				composite.map(({ accessory: { name, elevate } }) => ({ name, elevate }))
+			);
 
 			// Then queue the image composite edit -- // Only pass the array of settings to Sharp
 			await sharp(image)
