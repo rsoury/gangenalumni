@@ -150,6 +150,41 @@ const getCoords = async (image, awsFacialData) => {
 
 			return coords;
 		},
+		forCheekRight() {
+			// Use the center of midJawlineRight, mouthRight as X and rightEyeRight as Y to determine the coords
+			const jawlineLandmark = getLandmark("midJawlineRight");
+			const mouthLandmark = getLandmark("mouthRight");
+			const eyeLandmark = getLandmark("rightEyeRight");
+
+			const landmark = {
+				X: jawlineLandmark.X + (mouthLandmark.X - jawlineLandmark.X) / 2,
+				Y: eyeLandmark.Y + (jawlineLandmark.Y - eyeLandmark.Y) / 2
+			};
+
+			const coords = {
+				x: landmark.X * dimensions.width,
+				y: landmark.Y * dimensions.height
+			};
+
+			return coords;
+		},
+		forCheekLeft() {
+			const jawlineLandmark = getLandmark("midJawlineLeft");
+			const mouthLandmark = getLandmark("mouthLeft");
+			const eyeLandmark = getLandmark("leftEyeLeft");
+
+			const landmark = {
+				X: jawlineLandmark.X + (mouthLandmark.X - jawlineLandmark.X) / 2,
+				Y: eyeLandmark.Y + (jawlineLandmark.Y - eyeLandmark.Y) / 2
+			};
+
+			const coords = {
+				x: landmark.X * dimensions.width,
+				y: landmark.Y * dimensions.height
+			};
+
+			return coords;
+		},
 		forForeheadRight() {
 			// Use the rightEyeBrowRight landmark to determine the furthest right part of the face
 			// Then use the bottom of the image as the entry point.

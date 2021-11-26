@@ -30,6 +30,7 @@ const getCenterEntryCoords = async (imagePath) => {
 // eg. Used for nose score
 const produceSticker = async (imagePath) => ({
 	path: imagePath,
+	dimensions: await sizeOf(imagePath),
 	...(await getCenterEntryCoords(imagePath))
 });
 
@@ -60,12 +61,14 @@ const getAccessories = async () => {
 			left: {
 				x: noseScarLeftDimensions.width / 2,
 				y: noseScarLeftDimensions.height,
-				path: noseScarLeftPath
+				path: noseScarLeftPath,
+				dimensions: noseScarLeftDimensions
 			},
 			right: {
 				x: noseScarRightDimensions.width / 2,
 				y: noseScarRightDimensions.height,
-				path: noseScarRightPath
+				path: noseScarRightPath,
+				dimensions: noseScarRightDimensions
 			}
 		},
 		locations: ["nose"],
@@ -81,17 +84,24 @@ const getAccessories = async () => {
 				left: {
 					x: 135,
 					y: 135,
-					path: path.join(__dirname, "../../assets/cigarette-left.png")
+					path: path.join(__dirname, "../../assets/cigarette-left.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/cigarette-left.png")
+					)
 				},
 				right: {
 					x: 6,
 					y: 135,
-					path: path.join(__dirname, "../../assets/cigarette-right.png")
+					path: path.join(__dirname, "../../assets/cigarette-right.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/cigarette-right.png")
+					)
 				}
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose"
+			directionBy: "pose",
+			skipPigmentCheck: true
 		},
 		{
 			name: "vape",
@@ -100,17 +110,24 @@ const getAccessories = async () => {
 				left: {
 					x: 70,
 					y: 10,
-					path: path.join(__dirname, "../../assets/vape-left.png")
+					path: path.join(__dirname, "../../assets/vape-left.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/vape-left.png")
+					)
 				},
 				right: {
 					x: 15,
 					y: 10,
-					path: path.join(__dirname, "../../assets/vape-right.png")
+					path: path.join(__dirname, "../../assets/vape-right.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/vape-right.png")
+					)
 				}
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose"
+			directionBy: "pose",
+			skipPigmentCheck: true
 		},
 		noseScar,
 		{
@@ -120,12 +137,18 @@ const getAccessories = async () => {
 				left: {
 					x: 0,
 					y: 20,
-					path: path.join(__dirname, "../../assets/scar-eye-left.png")
+					path: path.join(__dirname, "../../assets/scar-eye-left.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/scar-eye-left.png")
+					)
 				},
 				right: {
 					x: 0,
 					y: 20,
-					path: path.join(__dirname, "../../assets/scar-eye-right.png")
+					path: path.join(__dirname, "../../assets/scar-eye-right.png"),
+					dimensions: await sizeOf(
+						path.join(__dirname, "../../assets/scar-eye-right.png")
+					)
 				}
 			},
 			locations: ["eye-left", "eye-right"],
@@ -278,21 +301,6 @@ const getAccessories = async () => {
 			name: "chin-bandaid",
 			probability: 0.025,
 			sticker: {
-				// left: {
-				// 	x: -10,
-				// 	y: 0,
-				// 	path: path.join(__dirname, "../../assets/bandaid-chin-left.png")
-				// },
-				// right: {
-				// 	x:
-				// 		(
-				// 			await sizeOf(
-				// 				path.join(__dirname, "../../assets/bandaid-chin-right.png")
-				// 			)
-				// 		).width + 10,
-				// 	y: 0,
-				// 	path: path.join(__dirname, "../../assets/bandaid-chin-right.png")
-				// }
 				left: await produceSticker(
 					path.join(__dirname, "../../assets/bandaid-chin-left.png")
 				),
@@ -301,7 +309,7 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["chin-left", "chin-right"],
-			elevate: 1,
+			elevate: 2,
 			directionBy: "symmetry"
 		},
 		{
@@ -316,7 +324,7 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
-			elevate: 1,
+			elevate: 2,
 			directionBy: "symmetry"
 		},
 		{
@@ -331,7 +339,7 @@ const getAccessories = async () => {
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
-			elevate: 1,
+			elevate: 2,
 			directionBy: "symmetry"
 		}
 	];

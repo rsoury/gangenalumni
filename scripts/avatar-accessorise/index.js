@@ -16,6 +16,7 @@ const _ = require("lodash");
 const clone = require("deep-clone");
 const sizeOf = require("image-size");
 const { createCanvas, loadImage } = require("canvas");
+const colorDifference = require("color-difference");
 
 const Queue = require("../queue");
 const options = require("../options")((program) => {
@@ -30,7 +31,7 @@ const options = require("../options")((program) => {
 });
 const getCoords = require("./coords");
 const getAccessories = require("./accessories");
-const { inspectObject } = require("../utils");
+const { inspectObject, rgbToHex } = require("../utils");
 const addLandmarkIndicators = require("./indicate");
 
 const { input, allOptions, indicate } = options;
@@ -116,6 +117,7 @@ mkdirp.sync(outputDir);
 			// const pixels = await getPixels(image);
 			const dimensions = await sizeOf(image);
 			const canvasImage = await loadImage(image);
+			const indicativeScanCompositeInput = [];
 
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
 			// TODO: Include some checks -- such as age -- before adding a cigarette/vape.
@@ -200,6 +202,14 @@ mkdirp.sync(outputDir);
 						featureCoords = coords.forChinLeft();
 						break;
 					}
+					case "cheek-right": {
+						featureCoords = coords.forCheekRight();
+						break;
+					}
+					case "cheek-left": {
+						featureCoords = coords.forCheekLeft();
+						break;
+					}
 					case "forehead-right": {
 						featureCoords = coords.forForeheadRight();
 						break;
@@ -225,43 +235,108 @@ mkdirp.sync(outputDir);
 					return;
 				}
 
-				// TODO: Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
+				//* Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
-				// Skin can be observed by taking the pigment from the cheek on the same side that the avatar is facing.
-				const facialLandmarks = _.get(
-					awsFrData,
-					"FaceDetails[0].Landmarks",
-					[]
-				);
-				const { X: pigmentLandmarkX } =
-					facialLandmarks.find(({ Type: type }) =>
-						type === isFacingLeft ? "noseLeft" : "noseRight"
-					) || {};
-				const { Y: pigmentLandmarkY } =
-					facialLandmarks.find(({ Type: type }) => type === "nose") || {};
-				if (
-					_.isUndefined(pigmentLandmarkX) ||
-					_.isUndefined(pigmentLandmarkY)
-				) {
-					throw new Error(
-						`Cannot find the Pigment Landmark Values for image ${image}`
+				// Skin can be observed by taking the pigment from the cheek/nose on the same side that the avatar is facing.
+				if (!accessory.skipPigmentCheck) {
+					const facialLandmarks = _.get(
+						awsFrData,
+						"FaceDetails[0].Landmarks",
+						[]
 					);
+					const { X: pigmentLandmarkX } =
+						facialLandmarks.find(({ Type: type }) =>
+							type === isFacingLeft ? "noseLeft" : "noseRight"
+						) || {};
+					const { Y: pigmentLandmarkY } =
+						facialLandmarks.find(({ Type: type }) => type === "nose") || {};
+					if (
+						_.isUndefined(pigmentLandmarkX) ||
+						_.isUndefined(pigmentLandmarkY)
+					) {
+						throw new Error(
+							`Cannot find the Pigment Landmark Values for image ${image}`
+						);
+					}
+					const canvas = createCanvas(dimensions.width, dimensions.height);
+					const ctx = canvas.getContext("2d");
+					ctx.drawImage(canvasImage, 0, 0);
+					const pigmentCoords = {
+						x: Math.round(pigmentLandmarkX * dimensions.width),
+						y: Math.round(pigmentLandmarkY * dimensions.height)
+					};
+					const pigmentPixel = ctx.getImageData(
+						pigmentCoords.x,
+						pigmentCoords.y,
+						1,
+						1
+					).data;
+					const referenceColor = rgbToHex(
+						pigmentPixel[0],
+						pigmentPixel[1],
+						pigmentPixel[2]
+					);
+					debugLog({ pigmentPixel, referenceColor });
+
+					// Iterate over the pixels in the area that is overlapped by the composite image.
+					// -- 1. Extract that area out of the original image using Sharp
+					// -- 2. Iterate over every pixel using getImageData on each coordinate within that extracted image.
+					// -- 3. If a percentage of the pixels are not within this color distance threshold, then skip the accessory.
+					// We can save these temp extracted images to disk for testing purposes.
+
+					const extract = {
+						left: Math.round(featureCoords.x - sticker.x),
+						top: Math.round(featureCoords.y - sticker.y),
+						width: sticker.dimensions.width,
+						height: sticker.dimensions.height
+					};
+					const diff = [];
+					for (let y = extract.top; y < extract.top + extract.height; y += 1) {
+						for (
+							let x = extract.left;
+							x < extract.left + extract.width;
+							x += 1
+						) {
+							const scanPixel = ctx.getImageData(x, y, 1, 1).data;
+							const scanColor = rgbToHex(
+								scanPixel[0],
+								scanPixel[1],
+								scanPixel[2]
+							);
+							diff.push(colorDifference.compare(referenceColor, scanColor));
+						}
+					}
+					if (indicate) {
+						// Add a soft layer indicating which area of the face was scanned.
+						indicativeScanCompositeInput.push({
+							input: {
+								create: {
+									width: extract.width,
+									height: extract.height,
+									channels: 4,
+									background: "rgba(16, 247, 12, 0.1)" // #10f70c
+								}
+							},
+							left: extract.left,
+							top: extract.top
+						});
+					}
+					const colorDistanceThreshold = 15;
+					const thresholdBreachCount = diff.reduce(
+						(accumulator, currentValue) => {
+							if (currentValue >= colorDistanceThreshold) {
+								accumulator += 1;
+							}
+							return accumulator;
+						},
+						0
+					);
+					const areaScanRatio = thresholdBreachCount / diff.length;
+					debugLog({ diff, thresholdBreachCount, areaScanRatio });
+					if (areaScanRatio > 0.2) {
+						return;
+					}
 				}
-				const canvas = createCanvas(dimensions.width, dimensions.height);
-				const ctx = canvas.getContext("2d");
-				ctx.drawImage(canvasImage, 0, 0);
-				const pigmentCoords = {
-					x: Math.round(pigmentLandmarkX * dimensions.width),
-					y: Math.round(pigmentLandmarkY * dimensions.height)
-				};
-				const pigmentPixel = ctx.getImageData(
-					pigmentCoords.x,
-					pigmentCoords.y,
-					1,
-					1
-				).data;
-				const referenceColor = `rgb(${pigmentPixel[0]}, ${pigmentPixel[1]}, ${pigmentPixel[2]})`;
-				debugLog({ pigmentPixel, referenceColor });
 
 				debugLog({ featureCoords, sticker });
 
@@ -300,7 +375,12 @@ mkdirp.sync(outputDir);
 					composite
 						.map(({ settings }) => settings)
 						.concat(
-							indicate ? await addLandmarkIndicators(image, awsFrData) : []
+							indicate
+								? [
+										...indicativeScanCompositeInput,
+										...(await addLandmarkIndicators(image, awsFrData))
+								  ]
+								: []
 						)
 				)
 				.toFile(outputFile);
