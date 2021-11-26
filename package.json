@@ -13,8 +13,8 @@
 		"filter": "node ./scripts/avatar-filter",
 		"generate": "node ./scripts/avatar-generator",
 		"postinstall": "make",
-		"lint": "solhint contracts/**/*.sol",
-		"format": "prettier --write contracts/**/*.sol"
+		"lint": "eslint -c ./.eslintrc.js \"{scripts,test}/**/*.js\" && solhint contracts/**/*.sol",
+		"format": "prettier --write {scripts,test}/**/*.js contracts/**/*.sol"
 	},
 	"devDependencies": {
 		"@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -40,6 +40,7 @@
 		"axios": "^0.24.0",
 		"axios-retry": "^3.2.4",
 		"better-queue": "^3.8.10",
+		"canvas": "^2.8.0",
 		"chalk": "^4.1.2",
 		"cheerio": "^1.0.0-rc.10",
 		"child-process-promise": "^2.2.1",
@@ -49,6 +50,7 @@
 		"deep-clone": "^3.0.3",
 		"del": "^6.0.0",
 		"envalid": "^7.2.2",
+		"get-pixels": "^3.3.3",
 		"glob": "^7.2.0",
 		"glob-promise": "^4.2.2",
 		"googleapis": "^89.0.0",

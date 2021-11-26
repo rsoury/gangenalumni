@@ -14,6 +14,8 @@ const debugLog = require("debug")("avatar-accessorise");
 const jsonfile = require("jsonfile");
 const _ = require("lodash");
 const clone = require("deep-clone");
+const sizeOf = require("image-size");
+const { createCanvas, loadImage } = require("canvas");
 
 const Queue = require("../queue");
 const options = require("../options")((program) => {
@@ -109,6 +111,11 @@ mkdirp.sync(outputDir);
 
 			// 4. Duplicate/Clone the accessories and randomly re-order to ensure that all accessories have the same opportunity to apply to the avatar
 			const cAccessories = _.shuffle(clone(accessories));
+
+			// Get size & pixels for image for later use
+			// const pixels = await getPixels(image);
+			const dimensions = await sizeOf(image);
+			const canvasImage = await loadImage(image);
 
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
 			// TODO: Include some checks -- such as age -- before adding a cigarette/vape.
@@ -221,6 +228,40 @@ mkdirp.sync(outputDir);
 				// TODO: Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
 				// Skin can be observed by taking the pigment from the cheek on the same side that the avatar is facing.
+				const facialLandmarks = _.get(
+					awsFrData,
+					"FaceDetails[0].Landmarks",
+					[]
+				);
+				const { X: pigmentLandmarkX } =
+					facialLandmarks.find(({ Type: type }) =>
+						type === isFacingLeft ? "noseLeft" : "noseRight"
+					) || {};
+				const { Y: pigmentLandmarkY } =
+					facialLandmarks.find(({ Type: type }) => type === "nose") || {};
+				if (
+					_.isUndefined(pigmentLandmarkX) ||
+					_.isUndefined(pigmentLandmarkY)
+				) {
+					throw new Error(
+						`Cannot find the Pigment Landmark Values for image ${image}`
+					);
+				}
+				const canvas = createCanvas(dimensions.width, dimensions.height);
+				const ctx = canvas.getContext("2d");
+				ctx.drawImage(canvasImage, 0, 0);
+				const pigmentCoords = {
+					x: Math.round(pigmentLandmarkX * dimensions.width),
+					y: Math.round(pigmentLandmarkY * dimensions.height)
+				};
+				const pigmentPixel = ctx.getImageData(
+					pigmentCoords.x,
+					pigmentCoords.y,
+					1,
+					1
+				).data;
+				const referenceColor = `rgb(${pigmentPixel[0]}, ${pigmentPixel[1]}, ${pigmentPixel[2]})`;
+				debugLog({ pigmentPixel, referenceColor });
 
 				debugLog({ featureCoords, sticker });
 
@@ -249,9 +290,9 @@ mkdirp.sync(outputDir);
 					return elevate1 - elevate2;
 				}
 			);
-			debugLog(
-				composite.map(({ accessory: { name, elevate } }) => ({ name, elevate }))
-			);
+			// debugLog(
+			// 	composite.map(({ accessory: { name, elevate } }) => ({ name, elevate }))
+			// );
 
 			// Then queue the image composite edit -- // Only pass the array of settings to Sharp
 			await sharp(image)
