@@ -97,7 +97,7 @@ if (!s3) {
 
 					await delay(500);
 
-					await exec(path.resolve(__dirname, "../../bin/snapcamera")); // Execute binary produced from main.go in root.
+					await exec(path.resolve(__dirname, "../../bin/snapcamera")); // Execute binary produced from pkg/snapcamera/main.go.
 
 					// Remove snapIndex and file increment as the Snap output file is cleaned at the end of the process.
 					const snapOutputFilename = `Snap Camera Photo${
