@@ -96,12 +96,12 @@ mkdirp.sync(outputDir);
 				return accumulator;
 			}, []);
 			let blacklistedLocations = [];
-			if (yaw > 15) {
+			if (yaw > 17.5) {
 				// Facing super to the right -- blacklist all "-left" locations
 				blacklistedLocations = allLocations.map(
 					(location) => !location.includes("-left")
 				);
-			} else if (yaw < -15) {
+			} else if (yaw < -17.5) {
 				// Facing super to the left -- blacklist all "-right" locations
 				blacklistedLocations = allLocations.map(
 					(location) => !location.includes("-right")
@@ -172,6 +172,15 @@ mkdirp.sync(outputDir);
 				);
 
 				const sticker = accessory.sticker[stickerDirection];
+				// Ensure that cheek stickers can fit based on facial yaw
+				if (
+					sticker.dimensions.width / dimensions.width >= 0.1 &&
+					((yaw > 10 && selectedLocation.includes("cheek-right")) ||
+						(yaw < -10 && selectedLocation.includes("cheek-left")))
+				) {
+					return;
+				}
+
 				let featureCoords = {};
 				switch (selectedLocation) {
 					case "mouth": {
@@ -332,7 +341,7 @@ mkdirp.sync(outputDir);
 						0
 					);
 					const areaScanRatio = thresholdBreachCount / diff.length;
-					debugLog({ diff, thresholdBreachCount, areaScanRatio });
+					debugLog({ thresholdBreachCount, areaScanRatio });
 					if (areaScanRatio > 0.2) {
 						return;
 					}
