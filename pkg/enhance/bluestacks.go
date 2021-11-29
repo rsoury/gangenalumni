@@ -1,8 +1,10 @@
 package main
 
 import (
+	"image"
 	"log"
-	"q"
+	"math"
+	"strings"
 
 	"github.com/go-vgo/robotgo"
 	"github.com/otiai10/gosseract/v2"
@@ -134,27 +136,38 @@ func (b *BlueStacks) GetBounds() Bounds {
 	}
 }
 
-// func (b *BlueStacks) CaptureApp() {
-// 	bounds := b.GetBounds()
-// 	robotgo.CaptureImg()
-// }
-
-func (b *BlueStacks) GetTextBounds(text string, level gosseract.PageIteratorLevel) (gosseract.BoundingBox, error) {
+func (b *BlueStacks) GetTextBounds(text string, level gosseract.PageIteratorLevel) ([]gosseract.BoundingBox, error) {
 	boxes, err := b.OCRClient.GetBoundingBoxes(level)
 	if err != nil {
-		return gosseract.BoundingBox{}, err
+		return []gosseract.BoundingBox{}, err
 	}
 
+	result := []gosseract.BoundingBox{}
 	for _, box := range boxes {
-		q.Q(box.Word)
+		if strings.Contains(box.Word, text) {
+			result = append(result, box)
+		}
 	}
 
-	return gosseract.BoundingBox{}, nil
+	return result, nil
 }
 
-func (b *BlueStacks) ShowImportedFiles() error {
-	box, err := b.GetTextBounds("Media Manager", gosseract.RIL_BLOCK)
-	q.Q(box)
+// func (b *BlueStacks) ShowImportedFiles() error {
+// 	box, err := b.GetTextBounds("Media Manager", gosseract.RIL_BLOCK)
+// 	q.Q(box)
 
-	return err
+// 	return err
+// }
+
+func (b *BlueStacks) GetCoordsFromCV(cvResult gcv.Result, screenImg image.Image) Coords {
+	landmark := map[string]float64{
+		"X": float64(cvResult.Middle.X) / float64(screenImg.Bounds().Dx()),
+		"Y": float64(cvResult.Middle.Y) / float64(screenImg.Bounds().Dy()),
+	}
+	coords := Coords{
+		X: int(math.Round(landmark["X"] * float64(b.ScreenWidth))),
+		Y: int(math.Round(landmark["Y"] * float64(b.ScreenHeight))),
+	}
+
+	return coords
 }

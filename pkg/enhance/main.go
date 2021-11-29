@@ -19,6 +19,7 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/nfnt/resize"
+	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
@@ -47,6 +48,16 @@ func main() {
 	}
 }
 
+func ImageToBytes(img image.Image) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := jpeg.Encode(buf, img, nil)
+	if err != nil {
+		return buf.Bytes(), err
+	}
+	imgBytes := buf.Bytes()
+	return imgBytes, nil
+}
+
 func EnhanceAll(cmd *cli.Command, args []string) {
 	var err error
 
@@ -64,8 +75,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Println("Start enhancement...")
 	}
 
-	// bluestacks := NewBlueStacks()
-	NewBlueStacks()
+	bluestacks := NewBlueStacks()
+	bluestacks.StartOCR()
+	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
@@ -73,6 +85,37 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	if debugMode {
 		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
 	}
+
+	// galleryControlImg, _, _ := robotgo.DecodeImg("./assets/faceapp/gallery.png")
+	// galleryRes := gcv.FindAllImg(galleryControlImg, screenImg)
+	// if len(galleryRes) == 0 {
+	// 	log.Fatal("ERROR: Cannot find the FaceApp Gallery Control")
+	// }
+	// galleryCoords := bluestacks.GetCoordsFromCV(galleryRes[0], screenImg)
+	// robotgo.MoveClick(galleryCoords.X, galleryCoords.Y)
+	// robotgo.MilliSleep(500) // Wait for animation to finish
+	// galleryScreenImg := robotgo.CaptureImg()
+	// folderFilterControlImg, _, _ := robotgo.DecodeImg("./assets/faceapp/folder-filter.png")
+	// folderFilterRes := gcv.FindAllImg(folderFilterControlImg, galleryControlImg)
+	// if len(folderFilterRes) == 0 {
+	// 	log.Fatal("ERROR: Cannot find the FaceApp Folder Filter Control")
+	// }
+	// folderFilterCoords := bluestacks.GetCoordsFromCV(folderFilterRes[0], galleryScreenImg)
+	// robotgo.MoveClick(folderFilterCoords.X, folderFilterCoords.Y)
+	// robotgo.MilliSleep(500) // Wait for animation to finish
+	// openFilterScreenImg := robotgo.CaptureImg()
+
+	// TODO: Don't spend too much time -- but try get this OCR to work better...
+	screenBytes, err := ImageToBytes(screenImg)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	_ = bluestacks.OCRClient.SetImageFromBytes(screenBytes)
+	boxes, err := bluestacks.GetTextBounds("SharedFolder", gosseract.RIL_TEXTLINE)
+	if err != nil {
+		log.Fatal("ERROR: Cannot find the FaceApp SharedFolder Text using OCR", err.Error())
+	}
+	q.Q(boxes)
 
 	// prepare image matrix
 	screenMat, _ := gocv.ImageToMatRGB(screenImg)

@@ -46,11 +46,11 @@ const produceCenterSticker = async (sticker) =>
 const getAccessories = async () => {
 	const noseScarLeftPath = path.join(
 		__dirname,
-		"../../assets/scar-nose-left.png"
+		"../../assets/stickers/scar-nose-left.png"
 	);
 	const noseScarRightPath = path.join(
 		__dirname,
-		"../../assets/scar-nose-right.png"
+		"../../assets/stickers/scar-nose-right.png"
 	);
 	const noseScarLeftDimensions = await sizeOf(noseScarLeftPath);
 	const noseScarRightDimensions = await sizeOf(noseScarRightPath);
@@ -84,17 +84,23 @@ const getAccessories = async () => {
 				left: {
 					x: 135,
 					y: 135,
-					path: path.join(__dirname, "../../assets/cigarette-left.png"),
+					path: path.join(
+						__dirname,
+						"../../assets/stickers/cigarette-left.png"
+					),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/cigarette-left.png")
+						path.join(__dirname, "../../assets/stickers/cigarette-left.png")
 					)
 				},
 				right: {
 					x: 6,
 					y: 135,
-					path: path.join(__dirname, "../../assets/cigarette-right.png"),
+					path: path.join(
+						__dirname,
+						"../../assets/stickers/cigarette-right.png"
+					),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/cigarette-right.png")
+						path.join(__dirname, "../../assets/stickers/cigarette-right.png")
 					)
 				}
 			},
@@ -110,17 +116,17 @@ const getAccessories = async () => {
 				left: {
 					x: 70,
 					y: 10,
-					path: path.join(__dirname, "../../assets/vape-left.png"),
+					path: path.join(__dirname, "../../assets/stickers/vape-left.png"),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/vape-left.png")
+						path.join(__dirname, "../../assets/stickers/vape-left.png")
 					)
 				},
 				right: {
 					x: 15,
 					y: 10,
-					path: path.join(__dirname, "../../assets/vape-right.png"),
+					path: path.join(__dirname, "../../assets/stickers/vape-right.png"),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/vape-right.png")
+						path.join(__dirname, "../../assets/stickers/vape-right.png")
 					)
 				}
 			},
@@ -137,17 +143,20 @@ const getAccessories = async () => {
 				left: {
 					x: 0,
 					y: 20,
-					path: path.join(__dirname, "../../assets/scar-eye-left.png"),
+					path: path.join(__dirname, "../../assets/stickers/scar-eye-left.png"),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/scar-eye-left.png")
+						path.join(__dirname, "../../assets/stickers/scar-eye-left.png")
 					)
 				},
 				right: {
 					x: 0,
 					y: 20,
-					path: path.join(__dirname, "../../assets/scar-eye-right.png"),
+					path: path.join(
+						__dirname,
+						"../../assets/stickers/scar-eye-right.png"
+					),
 					dimensions: await sizeOf(
-						path.join(__dirname, "../../assets/scar-eye-right.png")
+						path.join(__dirname, "../../assets/stickers/scar-eye-right.png")
 					)
 				}
 			},
@@ -160,10 +169,10 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/scar-forehead-left.png")
+					path.join(__dirname, "../../assets/stickers/scar-forehead-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/scar-forehead-right.png")
+					path.join(__dirname, "../../assets/stickers/scar-forehead-right.png")
 				)
 			},
 			locations: ["forehead-left", "forehead-right"],
@@ -175,10 +184,13 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/scar-2-forehead-left.png")
+					path.join(__dirname, "../../assets/stickers/scar-2-forehead-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/scar-2-forehead-right.png")
+					path.join(
+						__dirname,
+						"../../assets/stickers/scar-2-forehead-right.png"
+					)
 				)
 			},
 			locations: ["forehead-left", "forehead-right"],
@@ -189,7 +201,7 @@ const getAccessories = async () => {
 			name: "tattoo-1",
 			probability: 0.025,
 			sticker: await produceCenterSticker(
-				path.join(__dirname, "../../assets/tattoo.png")
+				path.join(__dirname, "../../assets/stickers/tattoo.png")
 			),
 			locations: [
 				"glabella",
@@ -207,7 +219,7 @@ const getAccessories = async () => {
 			name: "tattoo-2",
 			probability: 0.025,
 			sticker: await produceCenterSticker(
-				path.join(__dirname, "../../assets/tattoo-2.png")
+				path.join(__dirname, "../../assets/stickers/tattoo-2.png")
 			),
 			locations: [
 				"glabella",
@@ -225,7 +237,7 @@ const getAccessories = async () => {
 			name: "tattoo-3",
 			probability: 0.025,
 			sticker: await produceCenterSticker(
-				path.join(__dirname, "../../assets/tattoo-3.png")
+				path.join(__dirname, "../../assets/stickers/tattoo-3.png")
 			),
 			locations: [
 				"glabella",
@@ -243,7 +255,7 @@ const getAccessories = async () => {
 			name: "tattoo-music-note",
 			probability: 0.025,
 			sticker: await produceCenterSticker(
-				path.join(__dirname, "../../assets/tattoo-4.png")
+				path.join(__dirname, "../../assets/stickers/tattoo-4.png")
 			),
 			locations: ["glabella", "cheek-left", "cheek-right"],
 			elevate: 1,
@@ -253,7 +265,7 @@ const getAccessories = async () => {
 			name: "tattoo-smiley",
 			probability: 0.025,
 			sticker: await produceCenterSticker(
-				path.join(__dirname, "../../assets/tattoo-4.png")
+				path.join(__dirname, "../../assets/stickers/tattoo-4.png")
 			),
 			locations: [
 				"glabella",
@@ -272,10 +284,10 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/cross-neck-left.png")
+					path.join(__dirname, "../../assets/stickers/cross-neck-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/cross-neck-right.png")
+					path.join(__dirname, "../../assets/stickers/cross-neck-right.png")
 				)
 			},
 			locations: ["neck-left", "neck-right"],
@@ -287,10 +299,10 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/dragon-neck-left.png")
+					path.join(__dirname, "../../assets/stickers/dragon-neck-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/dragon-neck-right.png")
+					path.join(__dirname, "../../assets/stickers/dragon-neck-right.png")
 				)
 			},
 			locations: ["neck-left", "neck-right"],
@@ -302,10 +314,10 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-chin-left.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-chin-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-chin-right.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-chin-right.png")
 				)
 			},
 			locations: ["chin-left", "chin-right"],
@@ -317,10 +329,10 @@ const getAccessories = async () => {
 			probability: 0.025,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-left.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-right.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-right.png")
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
@@ -332,10 +344,10 @@ const getAccessories = async () => {
 			probability: 0.01,
 			sticker: {
 				left: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-evil-left.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-evil-left.png")
 				),
 				right: await produceSticker(
-					path.join(__dirname, "../../assets/bandaid-evil-right.png")
+					path.join(__dirname, "../../assets/stickers/bandaid-evil-right.png")
 				)
 			},
 			locations: ["cheek-left", "cheek-right"],
