@@ -2,7 +2,7 @@
  * Step 2.1 -- An optional step
  * Enhance the Human Avatars using FaceApp in BlueStacks
  *
- * Requires that Bluestacks is open, and that Media Manager has imported all images.
+ * Requires that Bluestacks 4 is open, and that Media Manager has imported all images.
  * Running enhance go script requires opencv4 as a dependency.
  */
 

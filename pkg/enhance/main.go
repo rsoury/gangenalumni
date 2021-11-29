@@ -5,13 +5,15 @@
 package main
 
 import (
-	"errors"
-	"fmt"
+	"bytes"
+	"image/jpeg"
+	"log"
 	"os"
-	"runtime"
+	"q"
 	"strconv"
 	"time"
 
+	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
@@ -28,96 +30,149 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().StringP("image", "i", "", "Image that will be matched with FaceApp Library")
+	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Run the enhancement in debug mode. Will output images to tmp folder.")
 	_ = rootCmd.MarkFlagRequired("image")
 }
 
 func main() {
 	// Run the program
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		os.Exit(1)
+		log.Fatalln("ERROR:", err)
 	}
 }
 
 func Enhance(cmd *cli.Command, args []string) {
-	fpid, err := robotgo.FindIds("BlueStacks")
-	if err != nil {
-		_ = fmt.Errorf(err.Error())
-	}
-	fmt.Println(fpid)
-	osName := runtime.GOOS
+	var err error
+	image := "./output/step2/1636551195604/46.jpeg"
+	// image := "./tmp/46.png"
+	// image := "./tmp/46-2.png"
+	// image := "./tmp/46-3.png"
+	imageId := 46
+	simageId := strconv.Itoa(imageId)
+	debugMode, _ := cmd.Flags().GetBool("debug")
+
 	currentTs := time.Now().Unix()
 	currentTsStr := strconv.FormatInt(currentTs, 10)
-	err = os.Mkdir("./tmp/"+currentTsStr, 0755) // Create tmp dir for this debug dump
-	if err != nil {
-		_ = fmt.Errorf(err.Error())
+	if debugMode {
+		err = os.MkdirAll("./tmp/enhance-debug/"+currentTsStr, 0755) // Create tmp dir for this debug dump
+		if err != nil {
+			log.Fatalln("ERROR:", err)
+		}
+		log.Println("Start enhancement in debug mode...")
+	} else {
+		log.Println("Start enhancement...")
 	}
-	err = robotgo.ActivePID(fpid[0])
-	if err != nil {
-		_ = fmt.Errorf(err.Error())
-	}
-	// windowX, windowY, windowWidth, windowHeight := robotgo.GetBounds(fpid[0])
-	//* Seems that GetBounds isn't returning the coordinates that are actually correct...
-	// Instead, we're simple going to use the screensize to set the mouse to the center of the screen.
-	screenWidth, screenHeight := robotgo.GetScreenSize()
 
-	// q.Q(map[string]int{
-	// 	"handle":       robotgo.GetHandle(),
-	// 	"screenWidth":  screenWidth,
-	// 	"screenHeight": screenHeight,
-	// 	"X":            windowX,
-	// 	"Y":            windowY,
-	// 	"width":        windowWidth,
-	// 	"height":       windowHeight,
-	// })
-
-	fmt.Println("Start enhancement...")
-
-	image, _ := cmd.Flags().GetString("image")
-
-	if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
-		_ = fmt.Errorf("ERROR: Image does not exist")
-	}
+	bluestacks := NewBlueStacks()
+	bluestacks.StartOCR()
+	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
 	screenImg := robotgo.CaptureImg()
 	img, _, err := robotgo.DecodeImg(image)
 	if err != nil {
-		_ = fmt.Errorf(err.Error())
+		log.Fatalln("ERROR:", err)
 	}
-	gcv.ImgWrite("./tmp/"+currentTsStr+"/target-image.jpg", img)
-	gcv.ImgWrite("./tmp/"+currentTsStr+"/screen-0.jpg", screenImg)
+	if debugMode {
+		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/target-image.jpg", img)
+		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
+	}
 
-	fmt.Println("gcv find image: ")
-	res := gcv.FindAllImg(img, screenImg)
-	yScroll := 480
-	if osName == "darwin" {
-		yScroll = -1 * yScroll // Scroll up for Mac to go down
+	// bounds := bluestacks.GetBounds()
+	// q.Q(bounds)
+
+	buf := new(bytes.Buffer)
+	err = jpeg.Encode(buf, screenImg, nil)
+	if err != nil {
+		log.Fatalln("ERROR:", err)
 	}
+	screenImgBytes := buf.Bytes()
+	err = bluestacks.OCRClient.SetImageFromBytes(screenImgBytes)
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+	log.Println("Search for file of id " + simageId + "...")
+
+	q.Q(gcv.FindAllImg(img, screenImg))
+
+	// mediaManagerImg, _, err := robotgo.DecodeImg("./assets/opencv/media-manager.png")
+	// if err != nil {
+	// 	log.Fatalln("ERROR:", err)
+	// }
+	// mediaManagerPos := gcv.FindAllImg(mediaManagerImg, screenImg)
+	// mediaManagerLandmark := map[string]float64{
+	// 	"X": float64(mediaManagerPos[0].Middle.X) / float64(screenImg.Bounds().Dx()),
+	// 	"Y": float64(mediaManagerPos[0].Middle.Y) / float64(screenImg.Bounds().Dy()),
+	// }
+	// mediaManagerCoords := map[string]int{
+	// 	"X": int(math.Round(mediaManagerLandmark["X"] * float64(bluestacks.ScreenWidth))),
+	// 	"Y": int(math.Round(mediaManagerLandmark["Y"] * float64(bluestacks.ScreenHeight))),
+	// }
+	// q.Q(mediaManagerLandmark, mediaManagerCoords)
+	// robotgo.Move(mediaManagerCoords["X"], mediaManagerCoords["Y"]) // TODO: Mouse Move not working...
+	// robotgo.Click()
+	err = bluestacks.ShowImportedFiles()
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
+
+	// err := bluestacks.OpenFile()
+
+	// bluestacks.ShowFaceApp()
+
+	log.Println("Finding image in screen: ")
 	count := 1
 	robotgo.MouseSleep = 100
-	centerCoordX := screenWidth / 2
-	centerCoordY := screenHeight / 2
-	for len(res) == 0 {
+	var res []gcv.Result
+	// We need a condition for identifying the end and start of the scroll.
+	// -- We can solve this by taking a screenshot, scrolling and then checking if there is a difference in the screenshots.
+	// scrollDirection := "down"
+	// if !bluestacks.CanSrollDown(100) {
+	// 	scrollDirection = "up"
+	// }
+	for {
 		countStr := strconv.Itoa(count)
-		// requires that we set the mouse position first.
-		// robotgo.Move(windowX+10, windowY+250)
-		robotgo.Move(centerCoordX, centerCoordY)
-		// robotgo.Scroll(0, yScroll) //* Scrolling does not work on the bluestacks vm
-		// robotgo.ScrollRelative(0, yScroll)
-		robotgo.DragSmooth(centerCoordX, centerCoordY-200)
-		robotgo.Move(centerCoordX, centerCoordY)
-		robotgo.DragSmooth(centerCoordX, centerCoordY-200)
-
-		time.Sleep(1 * time.Second) // Delay each iteration with a buffer
+		log.Println("Attempt " + countStr + " ...")
 
 		screenImg = robotgo.CaptureImg()
-		res = gcv.FindAllImg(img, screenImg)
-		gcv.ImgWrite("./tmp/"+currentTsStr+"/screen-"+countStr+".jpg", screenImg)
-		fmt.Println("Scrolling attempt " + countStr)
+		// res = gcv.FindAllImg(img, screenImg)
+		if debugMode {
+			gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-"+countStr+".jpg", screenImg)
+		}
+
+		if len(res) > 0 {
+			log.Println("Image has been found!")
+			break
+		}
+
+		// preImg := robotgo.CaptureImg()
+		// if scrollDirection == "down" {
+		// 	bluestacks.ScrollDown(150)
+		// } else if scrollDirection == "up" {
+		// 	bluestacks.ScrollUp(150)
+		// }
+		// robotgo.MilliSleep(500)
+		// postImg := robotgo.CaptureImg()
+		// // This following appraoch does a direct image comparison rather than an OpenCV search -- so it's more reliable for the use case.
+		// preHash, preImgSize := images.Hash(preImg)
+		// postHash, postImgSize := images.Hash(postImg)
+		// if images.Similar(preHash, postHash, preImgSize, postImgSize) {
+		// 	gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/pre.jpg", preImg)
+		// 	gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/post.jpg", postImg)
+		// 	log.Println("Scroll limit has been reach")
+		// 	break
+		// }
+		break
+
+		robotgo.MilliSleep(1000) // Delay each iteration with a buffer
 		count++
 	}
 	// We now have a result.
-	fmt.Println(res)
+	log.Println(res)
+
+	err = beeep.Notify("Automatically Animated", "Enhancement script is complete", "")
+	if err != nil {
+		log.Fatal("ERROR:", err)
+	}
 }
