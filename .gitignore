@@ -24,4 +24,4 @@ output
 dist
 build
 bin
-data
+data/aws

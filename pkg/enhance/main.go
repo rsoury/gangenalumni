@@ -6,6 +6,8 @@ package main
 
 import (
 	"bytes"
+	"image"
+	"image/color"
 	"image/jpeg"
 	"log"
 	"math"
@@ -19,6 +21,7 @@ import (
 	"github.com/nfnt/resize"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
+	"gocv.io/x/gocv"
 )
 
 var (
@@ -26,13 +29,14 @@ var (
 	rootCmd = &cli.Command{
 		Use:   "enhance",
 		Short: "Enhance",
-		Run:   Enhance,
+		Run:   EnhanceAll,
 	}
 )
 
 func init() {
 	rootCmd.PersistentFlags().StringP("image", "i", "", "Image that will be matched with FaceApp Library")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Run the enhancement in debug mode. Will output images to tmp folder.")
+	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier")
 	_ = rootCmd.MarkFlagRequired("image")
 }
 
@@ -41,6 +45,79 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalln("ERROR:", err)
 	}
+}
+
+func EnhanceAll(cmd *cli.Command, args []string) {
+	var err error
+
+	debugMode, _ := cmd.Flags().GetBool("debug")
+	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
+	currentTs := time.Now().Unix()
+	currentTsStr := strconv.FormatInt(currentTs, 10)
+	if debugMode {
+		err = os.MkdirAll("./tmp/enhance-debug/"+currentTsStr, 0755) // Create tmp dir for this debug dump
+		if err != nil {
+			log.Fatalln("ERROR:", err)
+		}
+		log.Println("Start enhancement in debug mode...")
+	} else {
+		log.Println("Start enhancement...")
+	}
+
+	// bluestacks := NewBlueStacks()
+	NewBlueStacks()
+
+	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
+
+	screenImg := robotgo.CaptureImg()
+	if debugMode {
+		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
+	}
+
+	// prepare image matrix
+	screenMat, _ := gocv.ImageToMatRGB(screenImg)
+	defer screenMat.Close()
+
+	// color for the rect when faces detected
+	blue := color.RGBA{0, 0, 255, 0}
+
+	// load classifier to recognize faces
+	classifier := gocv.NewCascadeClassifier()
+	defer classifier.Close()
+
+	if !classifier.Load(cascadeFile) {
+		log.Fatalf("Error reading cascade file: %v\n", cascadeFile)
+	}
+
+	// detect faces
+	rects := classifier.DetectMultiScale(screenMat)
+	var faces []image.Rectangle
+	for _, r := range rects {
+		if r.Dx() > 100 {
+			faces = append(faces, r)
+		}
+	}
+	log.Printf("Found %d faces\n", len(faces))
+
+	// draw a rectangle around each face on the original image,
+	// along with text identifing as "Human"
+	for _, r := range faces {
+		gocv.Rectangle(&screenMat, r, blue, 3)
+
+		size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
+		pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
+		gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+	}
+
+	if debugMode {
+		if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", screenMat) {
+			log.Println("Successfully created image with faces detected")
+		} else {
+			log.Println("Failed to create image with faces detected")
+		}
+	}
+
+	_ = beeep.Notify("Automatically Animated", "Enhancement script is complete", "")
 }
 
 func Enhance(cmd *cli.Command, args []string) {
