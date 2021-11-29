@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"image/jpeg"
 	"log"
+	"math"
 	"os"
 	"q"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
+	"github.com/nfnt/resize"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 )
@@ -43,12 +45,14 @@ func main() {
 
 func Enhance(cmd *cli.Command, args []string) {
 	var err error
-	image := "./output/step2/1636551195604/46.jpeg"
-	// image := "./tmp/46.png"
-	// image := "./tmp/46-2.png"
-	// image := "./tmp/46-3.png"
-	imageId := 46
-	simageId := strconv.Itoa(imageId)
+	searchImage := "./output/step2/1636551195604/46.jpeg"
+	// searchImage := "./tmp/46.png"
+	// searchImage := "./tmp/46-2.png"
+	// searchImage := "./tmp/46-3.png"
+	// searchImage := "./tmp/46-4.png"
+	// searchImage := "./tmp/46-5.png"
+	searchImageId := 46
+	simageId := strconv.Itoa(searchImageId)
 	debugMode, _ := cmd.Flags().GetBool("debug")
 
 	currentTs := time.Now().Unix()
@@ -70,7 +74,7 @@ func Enhance(cmd *cli.Command, args []string) {
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
 	screenImg := robotgo.CaptureImg()
-	img, _, err := robotgo.DecodeImg(image)
+	img, _, err := robotgo.DecodeImg(searchImage)
 	if err != nil {
 		log.Fatalln("ERROR:", err)
 	}
@@ -94,7 +98,26 @@ func Enhance(cmd *cli.Command, args []string) {
 	}
 	log.Println("Search for file of id " + simageId + "...")
 
-	q.Q(gcv.FindAllImg(img, screenImg))
+	// Produce multiple sizes for the search image
+	// var searchImgs []image.Image
+	for i := 1; i <= 10; i++ {
+		sImg := resize.Resize(uint(math.Round(float64(img.Bounds().Dx())/float64(i))), 0, img, resize.Lanczos3)
+		// searchImgs = append(searchImgs, newImg)
+		q.Q(i, sImg.Bounds().Dx(), sImg.Bounds().Dy())
+		q.Q(gcv.FindAllImg(sImg, screenImg, 0.6))
+		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/target-image-resize"+strconv.Itoa(i)+".jpg", sImg)
+
+		// cImg := gocv.Canny()
+	}
+
+	// https://stackoverflow.com/questions/50641197/opencv-fails-to-match-template-with-imagematchtemplate
+	// for i := 1; i <= 10; i++ {
+	// 	sourceImg := resize.Resize(uint(math.Round(float64(img.Bounds().Dx())*float64(i/10+1))), 0, screenImg, resize.Lanczos3)
+	// 	// searchImgs = append(searchImgs, newImg)
+	// 	q.Q(i, sourceImg.Bounds().Dx(), sourceImg.Bounds().Dy())
+	// 	q.Q(gcv.FindAllImg(img, sourceImg))
+	// 	gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/source-image-resize"+strconv.Itoa(i)+".jpg", sourceImg)
+	// }
 
 	// mediaManagerImg, _, err := robotgo.DecodeImg("./assets/opencv/media-manager.png")
 	// if err != nil {
@@ -112,10 +135,10 @@ func Enhance(cmd *cli.Command, args []string) {
 	// q.Q(mediaManagerLandmark, mediaManagerCoords)
 	// robotgo.Move(mediaManagerCoords["X"], mediaManagerCoords["Y"]) // TODO: Mouse Move not working...
 	// robotgo.Click()
-	err = bluestacks.ShowImportedFiles()
-	if err != nil {
-		log.Fatalln("ERROR:", err)
-	}
+	// err = bluestacks.ShowImportedFiles()
+	// if err != nil {
+	// 	log.Fatalln("ERROR:", err)
+	// }
 
 	// err := bluestacks.OpenFile()
 

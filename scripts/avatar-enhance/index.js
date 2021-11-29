@@ -68,6 +68,7 @@ mkdirp.sync(outputDir);
 			 * 3. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
 			 * 4. Check if user has glasses -- add glasses -- random selection
 			 * 5. Check if female, and probability for make up -- add make up -- random selection
+			 * 6. Plus size the person by chance too -- there should be heavier people.
 			 */
 
 			return image;
