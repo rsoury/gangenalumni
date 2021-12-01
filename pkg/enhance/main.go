@@ -19,6 +19,7 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/nfnt/resize"
+	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
@@ -74,11 +75,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Println("Start enhancement...")
 	}
 
-	// bluestacks := NewBlueStacks()
-	NewBlueStacks()
+	bluestacks := NewBlueStacks()
 
-	// bluestacks.StartOCR()
-	// bluestacks.OCRClient.Close()
+	bluestacks.StartOCR()
+	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
@@ -87,37 +87,26 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
 	}
 
-	robotgo.MoveSmooth(300, 300)
-
-	// bluestacks.ScrollUp(10) // Scroll up to ensure that gallery button shows.
-	// galleryControlImg, _, _ := robotgo.DecodeImg("./assets/faceapp/gallery.png")
-	// galleryRes := gcv.FindAllImg(galleryControlImg, screenImg)
-	// if len(galleryRes) == 0 {
-	// 	log.Fatal("ERROR: Cannot find the FaceApp Gallery Control")
-	// }
-	// galleryCoords := bluestacks.GetCoordsFromCV(galleryRes[0], screenImg)
-	// robotgo.MoveClick(galleryCoords.X, galleryCoords.Y)
-	// robotgo.MilliSleep(500) // Wait for animation to finish
-	// galleryScreenImg := robotgo.CaptureImg()
-	// folderFilterControlImg, _, _ := robotgo.DecodeImg("./assets/faceapp/folder-filter.png")
-	// folderFilterRes := gcv.FindAllImg(folderFilterControlImg, galleryControlImg)
-	// if len(folderFilterRes) == 0 {
-	// 	log.Fatal("ERROR: Cannot find the FaceApp Folder Filter Control")
-	// }
-	// folderFilterCoords := bluestacks.GetCoordsFromCV(folderFilterRes[0], galleryScreenImg)
-	// robotgo.MoveClick(folderFilterCoords.X, folderFilterCoords.Y)
-	// robotgo.MilliSleep(500) // Wait for animation to finish
-	// openFilterScreenImg := robotgo.CaptureImg()
-
-	// sharedFolderCoords, err := bluestacks.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
-	// if err != nil {
-	// 	log.Fatal("ERROR: Cannot find the FaceApp SharedFolder Text using OCR", err.Error())
-	// }
-	// q.Q(sharedFolderCoords)
-	// bluestacks.OCRClient.Close()
-
-	// robotgo.Move(sharedFolderCoords.X, sharedFolderCoords.Y) // TODO: These Mouse Move operations are not working... -- It seems the OCR is responsible for this issue...
-	// robotgo.Click()
+	bluestacks.ScrollUp(50) // Scroll up to ensure that gallery button shows.
+	controlCoords, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	bluestacks.MoveClick(controlCoords.X, controlCoords.Y)
+	robotgo.MilliSleep(500) // Wait for animation to finish
+	screenImg = robotgo.CaptureImg()
+	controlCoords, err = bluestacks.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	bluestacks.MoveClick(controlCoords.X, controlCoords.Y)
+	robotgo.MilliSleep(500) // Wait for animation to finish
+	screenImg = robotgo.CaptureImg()
+	sharedFolderCoords, err := bluestacks.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	bluestacks.MoveClick(sharedFolderCoords.X, sharedFolderCoords.Y)
 
 	// prepare image matrix
 	screenMat, _ := gocv.ImageToMatRGB(screenImg)

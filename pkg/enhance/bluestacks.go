@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"image"
 	"log"
 	"math"
@@ -78,27 +79,28 @@ func (b *BlueStacks) StartOCR() {
 	b.OCRClient = gosseract.NewClient()
 }
 
-func (b *BlueStacks) scroll(scrollDirection string, scrollBy int) {
-	if scrollDirection != "down" && scrollDirection != "up" {
-		scrollDirection = "down"
-	}
-	if scrollDirection == "down" {
-		scrollBy = -scrollBy
-	}
+func (b *BlueStacks) MoveClick(x, y int) {
+	robotgo.Move(x, y)
+	robotgo.MilliSleep(100)
+	robotgo.Click()
+}
 
-	// // Scroll twice because thre screensize isn't big enough
+func (b *BlueStacks) scroll(scrollBy int) {
 	robotgo.Move(b.CenterCoords.X, b.CenterCoords.Y)
+	robotgo.MilliSleep(100)
+	// If the scrollBy integer is small enough, Bluestacks will simply register the micro drag as a tap/click
+	if scrollBy < 50 {
+		scrollBy = 50
+	}
 	robotgo.DragSmooth(b.CenterCoords.X, b.CenterCoords.Y+scrollBy)
-	// robotgo.Move(b.CenterCoords.X, b.CenterCoords.Y)
-	// robotgo.DragSmooth(b.CenterCoords.X, b.CenterCoords.Y+scrollBy)
 }
 
 func (b *BlueStacks) ScrollUp(scrollBy int) {
-	b.scroll("up", scrollBy)
+	b.scroll(scrollBy)
 }
 
 func (b *BlueStacks) ScrollDown(scrollBy int) {
-	b.scroll("down", scrollBy)
+	b.scroll(-scrollBy)
 }
 
 // Private reusable function to determine if there is anymore scroll capability.
@@ -150,6 +152,13 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 	_ = b.OCRClient.SetImageFromBytes(screenBytes)
 
 	boxes, err := b.OCRClient.GetBoundingBoxes(level)
+	// for _, box := range boxes {
+	// 	if strings.Contains(box.Word, text) || strings.Contains(box.Word, strings.ReplaceAll(text, " ", "")) {
+	// 		q.Q(box)
+	// 	} else {
+	// 		q.Q(box.Word)
+	// 	}
+	// }
 	if err != nil {
 		return Coords{}, err
 	}
@@ -160,6 +169,10 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 			result = b.GetCoords((box.Box.Min.X+box.Box.Max.X)/2, (box.Box.Min.Y+box.Box.Max.Y)/2, img)
 			break
 		}
+	}
+
+	if result == (Coords{}) {
+		return result, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
 	}
 
 	return result, nil
@@ -180,4 +193,17 @@ func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 	}
 
 	return coords
+}
+
+func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, error) {
+	res := gcv.FindAllImg(searchImg, sourceImg)
+	if len(res) == 0 {
+		return Coords{}, errors.New("Cannot find image inside of source image")
+	}
+	return b.GetCoordsFromCV(res[0], sourceImg), nil
+}
+
+func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image.Image) (Coords, error) {
+	searchImg, _, _ := robotgo.DecodeImg(imagePath)
+	return b.GetImageCoordsInImage(searchImg, sourceImg)
 }
