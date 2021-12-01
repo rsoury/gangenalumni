@@ -18,6 +18,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"q"
 	"strconv"
 	"time"
@@ -25,10 +26,12 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/nfnt/resize"
+	"github.com/oliamb/cutter"
 	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
+	"gocv.io/x/gocv/contrib"
 )
 
 var (
@@ -65,6 +68,22 @@ func ImageToBytes(img image.Image) ([]byte, error) {
 	return imgBytes, nil
 }
 
+func setupHashes() []contrib.ImgHashBase {
+	var hashes []contrib.ImgHashBase
+
+	hashes = append(hashes, contrib.PHash{})
+	hashes = append(hashes, contrib.AverageHash{})
+	hashes = append(hashes, contrib.BlockMeanHash{})
+	hashes = append(hashes, contrib.BlockMeanHash{Mode: contrib.BlockMeanHashMode1})
+	hashes = append(hashes, contrib.ColorMomentHash{})
+	// MarrHildreth has default parameters for alpha/scale
+	hashes = append(hashes, contrib.NewMarrHildrethHash())
+	// RadialVariance has default parameters too
+	hashes = append(hashes, contrib.NewRadialVarianceHash())
+
+	return hashes
+}
+
 func EnhanceAll(cmd *cli.Command, args []string) {
 	var err error
 
@@ -98,7 +117,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
 	// Index each face to an output directory
-	var imageIndex []map[string]string
+	// var imageIndex []map[string]string
+	// Fetch all the images from the source directory
+	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*"))
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	q.Q(sourceImagePaths)
 
 	screenImg := robotgo.CaptureImg()
 	if debugMode {
@@ -154,6 +179,84 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	// TODO: Create a map of original detected faces to the enhanced faces
 	// Add to the image index map
+	var simHash contrib.AverageHash
+	for _, rect := range faces {
+		// Run the enhancement process inside of this loop
+		// 1. Click on the face to load it
+		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
+		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
+		// 2. Wait for the face to appear
+		count := 0
+		var validRects []image.Rectangle
+		var detectedScreenImg image.Image
+		for {
+			count++
+			robotgo.MilliSleep(1000)
+			sImg := robotgo.CaptureImg()
+			sMat, _ := gocv.ImageToMatRGB(sImg)
+			defer sMat.Close()
+			sRects := classifier.DetectMultiScale(sMat)
+			for _, r := range sRects {
+				if r.Dx() > 100 {
+					validRects = append(validRects, r)
+				}
+			}
+			if len(validRects) > 0 {
+				detectedScreenImg = sImg
+				break
+			} else if count > 10 {
+				break
+			}
+		}
+		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
+		if len(validRects) == 0 {
+			continue
+		}
+
+		// 3. Once the face is detected, match it against the files in the source directory.
+		detectedImg, _ := cutter.Crop(detectedScreenImg, cutter.Config{
+			Width:  validRects[0].Dx(),
+			Height: validRects[0].Dy(),
+			Anchor: image.Point{
+				X: validRects[0].Min.X,
+				Y: validRects[0].Min.Y,
+			},
+			Mode: cutter.TopLeft,
+		})
+		dMat, _ := gocv.ImageToMatRGB(detectedImg)
+		if dMat.Empty() {
+			log.Fatalln("Cannot load image matrix for face")
+		}
+		defer dMat.Close()
+		dHash := gocv.NewMat()
+		defer dHash.Close()
+		simHash.Compute(dMat, &dHash)
+		if dHash.Empty() {
+			log.Println("Cannot compute hash for detected image")
+		}
+
+		for _, sourceImagePath := range sourceImagePaths {
+			srcMat := gocv.IMRead(sourceImagePath, gocv.IMReadColor)
+			if srcMat.Empty() {
+				log.Printf("Cannot read image %s\n", sourceImagePath)
+			}
+			defer srcMat.Close()
+			srcHash := gocv.NewMat()
+			defer srcHash.Close()
+			// image similarity
+			simHash.Compute(srcMat, &srcHash)
+			if srcHash.Empty() {
+				log.Printf("Cannot compute hash for image %s\n", sourceImagePath)
+			}
+
+			// compare for similarity; this returns a float64, but the meaning of values is
+			// unique to each algorithm.
+			similar := simHash.Compare(dHash, srcHash)
+
+			q.Q(sourceImagePath, similar)
+		}
+	}
+
 	// for i, face := range faces {
 	// 	// Run the enhancement process inside of this loop
 	// 	count := len(imageIndex) + i
