@@ -1,6 +1,11 @@
-/*
-	This binary is desiged to accept an image and perform enhancements on said image.
-*/
+/**
+ * Step 2.1 -- An optional step
+ * Enhance the Human Avatars using FaceApp in BlueStacks
+ * Developed in Golang for to use robotgo
+ *
+ * Requires that Bluestacks 4 is open, and that Media Manager has imported all images.
+ * Running enhance go script requires opencv4 as a dependency.
+ */
 
 package main
 
@@ -12,6 +17,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"path"
 	"q"
 	"strconv"
 	"time"
@@ -35,10 +41,11 @@ var (
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringP("image", "i", "", "Image that will be matched with FaceApp Library")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Run the enhancement in debug mode. Will output images to tmp folder.")
-	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier")
-	_ = rootCmd.MarkFlagRequired("image")
+	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier.")
+	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
+	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
+	_ = rootCmd.MarkFlagRequired("source")
 }
 
 func main() {
@@ -63,6 +70,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	debugMode, _ := cmd.Flags().GetBool("debug")
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
+	outputParentDir, _ := cmd.Flags().GetString("output")
+	sourceDir, _ := cmd.Flags().GetString("source")
 	currentTs := time.Now().Unix()
 	currentTsStr := strconv.FormatInt(currentTs, 10)
 	if debugMode {
@@ -74,6 +83,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	} else {
 		log.Println("Start enhancement...")
 	}
+	// Create output directory
+	outputDir := path.Join(outputParentDir, currentTsStr)
+	err = os.MkdirAll(outputDir, 0755)
+	if err != nil {
+		log.Fatalln("ERROR:", err)
+	}
 
 	bluestacks := NewBlueStacks()
 
@@ -81,6 +96,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
+
+	// Index each face to an output directory
+	var imageIndex []map[string]string
 
 	screenImg := robotgo.CaptureImg()
 	if debugMode {
@@ -109,6 +127,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	bluestacks.MoveClick(sharedFolderCoords.X, sharedFolderCoords.Y)
 
 	// prepare image matrix
+	screenImg = robotgo.CaptureImg()
 	screenMat, _ := gocv.ImageToMatRGB(screenImg)
 	defer screenMat.Close()
 
@@ -133,17 +152,40 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	}
 	log.Printf("Found %d faces\n", len(faces))
 
-	// draw a rectangle around each face on the original image,
-	// along with text identifing as "Human"
-	for _, r := range faces {
-		gocv.Rectangle(&screenMat, r, blue, 3)
+	// TODO: Create a map of original detected faces to the enhanced faces
+	// Add to the image index map
+	// for i, face := range faces {
+	// 	// Run the enhancement process inside of this loop
+	// 	count := len(imageIndex) + i
+	// 	detectedImg := image.NewRGBA(face)
+	// 	detectedPath := path.Join(outputDir, "detected-"+strconv.Itoa(count)+".jpeg")
+	// 	f, err := os.Create(detectedPath)
+	// 	if err != nil {
+	// 		log.Fatal("ERROR: ", err.Error())
+	// 	}
+	// 	// jpeg.Encode(f, , &jpeg.Options{
+	// 	// 	Quality: 90,
+	// 	// })
 
-		size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
-		pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
-		gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
-	}
+	// 	imageMap := map[string]string{
+	// 		"detected": detectedPath,
+	// 		// "enhanced": enhancedPath,
+	// 	}
+	// 	imageIndex = append(imageIndex, imageMap)
+	// 	f.Close()
+	// }
 
 	if debugMode {
+		// draw a rectangle around each face on the original image,
+		// along with text identifing as "Human"
+		for _, r := range faces {
+			gocv.Rectangle(&screenMat, r, blue, 3)
+
+			size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
+			pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
+			gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+		}
+
 		if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", screenMat) {
 			log.Println("Successfully created image with faces detected")
 		} else {
