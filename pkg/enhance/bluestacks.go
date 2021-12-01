@@ -9,6 +9,7 @@ import (
 	"github.com/go-vgo/robotgo"
 	"github.com/otiai10/gosseract/v2"
 	"github.com/vcaesar/gcv"
+	"gocv.io/x/gocv"
 )
 
 type Coords struct {
@@ -136,33 +137,42 @@ func (b *BlueStacks) GetBounds() Bounds {
 	}
 }
 
-func (b *BlueStacks) GetTextBounds(text string, level gosseract.PageIteratorLevel) ([]gosseract.BoundingBox, error) {
+func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level gosseract.PageIteratorLevel) (Coords, error) {
+	screenForOCRMat, _ := gocv.ImageToMatRGB(img)
+	defer screenForOCRMat.Close()
+	// Seems greyscaling the image helps heaps.
+	gocv.CvtColor(screenForOCRMat, &screenForOCRMat, gocv.ColorBGRAToGray)
+	screenForOCR, _ := screenForOCRMat.ToImage()
+	screenBytes, err := ImageToBytes(screenForOCR)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	_ = b.OCRClient.SetImageFromBytes(screenBytes)
+
 	boxes, err := b.OCRClient.GetBoundingBoxes(level)
 	if err != nil {
-		return []gosseract.BoundingBox{}, err
+		return Coords{}, err
 	}
 
-	result := []gosseract.BoundingBox{}
+	var result Coords
 	for _, box := range boxes {
-		if strings.Contains(box.Word, text) {
-			result = append(result, box)
+		if strings.Contains(box.Word, text) && box.Confidence > 80 {
+			result = b.GetCoords((box.Box.Min.X+box.Box.Max.X)/2, (box.Box.Min.Y+box.Box.Max.Y)/2, img)
+			break
 		}
 	}
 
 	return result, nil
 }
 
-// func (b *BlueStacks) ShowImportedFiles() error {
-// 	box, err := b.GetTextBounds("Media Manager", gosseract.RIL_BLOCK)
-// 	q.Q(box)
-
-// 	return err
-// }
-
 func (b *BlueStacks) GetCoordsFromCV(cvResult gcv.Result, screenImg image.Image) Coords {
+	return b.GetCoords(cvResult.Middle.X, cvResult.Middle.Y, screenImg)
+}
+
+func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 	landmark := map[string]float64{
-		"X": float64(cvResult.Middle.X) / float64(screenImg.Bounds().Dx()),
-		"Y": float64(cvResult.Middle.Y) / float64(screenImg.Bounds().Dy()),
+		"X": float64(x) / float64(screenImg.Bounds().Dx()),
+		"Y": float64(y) / float64(screenImg.Bounds().Dy()),
 	}
 	coords := Coords{
 		X: int(math.Round(landmark["X"] * float64(b.ScreenWidth))),

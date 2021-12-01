@@ -19,7 +19,6 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/nfnt/resize"
-	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
@@ -75,9 +74,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Println("Start enhancement...")
 	}
 
-	bluestacks := NewBlueStacks()
-	bluestacks.StartOCR()
-	defer bluestacks.OCRClient.Close()
+	// bluestacks := NewBlueStacks()
+	NewBlueStacks()
+
+	// bluestacks.StartOCR()
+	// bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
@@ -86,6 +87,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
 	}
 
+	robotgo.MoveSmooth(300, 300)
+
+	// bluestacks.ScrollUp(10) // Scroll up to ensure that gallery button shows.
 	// galleryControlImg, _, _ := robotgo.DecodeImg("./assets/faceapp/gallery.png")
 	// galleryRes := gcv.FindAllImg(galleryControlImg, screenImg)
 	// if len(galleryRes) == 0 {
@@ -105,17 +109,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	// robotgo.MilliSleep(500) // Wait for animation to finish
 	// openFilterScreenImg := robotgo.CaptureImg()
 
-	// TODO: Don't spend too much time -- but try get this OCR to work better...
-	screenBytes, err := ImageToBytes(screenImg)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	_ = bluestacks.OCRClient.SetImageFromBytes(screenBytes)
-	boxes, err := bluestacks.GetTextBounds("SharedFolder", gosseract.RIL_TEXTLINE)
-	if err != nil {
-		log.Fatal("ERROR: Cannot find the FaceApp SharedFolder Text using OCR", err.Error())
-	}
-	q.Q(boxes)
+	// sharedFolderCoords, err := bluestacks.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
+	// if err != nil {
+	// 	log.Fatal("ERROR: Cannot find the FaceApp SharedFolder Text using OCR", err.Error())
+	// }
+	// q.Q(sharedFolderCoords)
+	// bluestacks.OCRClient.Close()
+
+	// robotgo.Move(sharedFolderCoords.X, sharedFolderCoords.Y) // TODO: These Mouse Move operations are not working... -- It seems the OCR is responsible for this issue...
+	// robotgo.Click()
 
 	// prepare image matrix
 	screenMat, _ := gocv.ImageToMatRGB(screenImg)
