@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
@@ -37,6 +38,7 @@ require (
 	github.com/vcaesar/imgo v0.30.0 // indirect
 	github.com/vcaesar/tt v0.20.0 // indirect
 	github.com/vitali-fedulov/images v2.0.1+incompatible // indirect
+	github.com/vitali-fedulov/images/v2 v2.0.4 // indirect
 	gocv.io/x/gocv v0.29.0 // indirect
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect

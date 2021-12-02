@@ -2,14 +2,19 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"log"
 	"math"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/go-vgo/robotgo"
 	"github.com/otiai10/gosseract/v2"
 	"github.com/vcaesar/gcv"
+	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 )
 
@@ -31,6 +36,17 @@ type BlueStacks struct {
 	ScreenWidth  int
 	ScreenHeight int
 	CenterCoords *Coords
+}
+
+type CVResult struct {
+	Confidence  float32
+	Point       image.Point
+	SearchImage image.Image
+	SourceImage image.Image
+}
+type OCRResult struct {
+	Bounds      gosseract.BoundingBox
+	SourceImage image.Image
 }
 
 func NewBlueStacks() *BlueStacks {
@@ -105,6 +121,11 @@ func (b *BlueStacks) ScrollDown(scrollBy int) {
 
 // Private reusable function to determine if there is anymore scroll capability.
 func (b *BlueStacks) canScroll(scrollBy int) bool {
+	// Prevent Drags from clicking.
+	if scrollBy < 50 {
+		scrollBy = 50
+	}
+
 	preImg := robotgo.CaptureImg()
 	robotgo.Move(b.CenterCoords.X, b.CenterCoords.Y)
 	robotgo.DragSmooth(b.CenterCoords.X, b.CenterCoords.Y+scrollBy)
@@ -115,9 +136,14 @@ func (b *BlueStacks) canScroll(scrollBy int) bool {
 	robotgo.DragSmooth(b.CenterCoords.X, b.CenterCoords.Y-scrollBy)
 	robotgo.MilliSleep(500)
 
-	res := gcv.FindAllImg(postImg, preImg)
-	// if there are results, it means that the search found the pre & post images are the same -- which means that the scroll did not affect the visual output
-	return len(res) == 0
+	// res := gcv.FindAllImg(postImg, preImg)
+	// Use an image similarity comparison instead
+	// Calculate hashes and image sizes.
+	hashA, imgSizeA := images.Hash(preImg)
+	hashB, imgSizeB := images.Hash(postImg)
+
+	// Image comparison.
+	return !images.Similar(hashA, hashB, imgSizeA, imgSizeB)
 }
 
 func (b *BlueStacks) CanSrollDown(scrollBy int) bool {
@@ -140,42 +166,47 @@ func (b *BlueStacks) GetBounds() Bounds {
 }
 
 func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level gosseract.PageIteratorLevel) (Coords, error) {
-	screenForOCRMat, _ := gocv.ImageToMatRGB(img)
-	defer screenForOCRMat.Close()
-	// Seems greyscaling the image helps heaps.
-	gocv.CvtColor(screenForOCRMat, &screenForOCRMat, gocv.ColorBGRAToGray)
-	screenForOCR, _ := screenForOCRMat.ToImage()
-	screenBytes, err := ImageToBytes(screenForOCR)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	_ = b.OCRClient.SetImageFromBytes(screenBytes)
+	// Produce multiple sizes for the search image
+	var res OCRResult
+	for i := 0; i <= 9; i++ {
+		resizeWidth := int(math.Round(float64(img.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
+		rImg := imaging.Resize(img, resizeWidth, 0, imaging.Lanczos)
+		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
+		rMat, _ := gocv.ImageToMatRGB(rImg)
 
-	boxes, err := b.OCRClient.GetBoundingBoxes(level)
-	// for _, box := range boxes {
-	// 	if strings.Contains(box.Word, text) || strings.Contains(box.Word, strings.ReplaceAll(text, " ", "")) {
-	// 		q.Q(box)
-	// 	} else {
-	// 		q.Q(box.Word)
-	// 	}
-	// }
-	if err != nil {
-		return Coords{}, err
-	}
+		// Seems greyscaling the image help with OCR.
+		gocv.CvtColor(rMat, &rMat, gocv.ColorBGRAToGray)
 
-	var result Coords
-	for _, box := range boxes {
-		if strings.Contains(box.Word, text) && box.Confidence > 80 {
-			result = b.GetCoords((box.Box.Min.X+box.Box.Max.X)/2, (box.Box.Min.Y+box.Box.Max.Y)/2, img)
-			break
+		imgBytes, err := ImageToBytes(img)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		_ = b.OCRClient.SetImageFromBytes(imgBytes)
+
+		boxes, err := b.OCRClient.GetBoundingBoxes(level)
+		if err != nil {
+			return Coords{}, err
+		}
+		if len(boxes) == 0 {
+			return Coords{}, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
+		}
+
+		for _, box := range boxes {
+			if strings.Contains(box.Word, text) {
+				if box.Confidence > res.Bounds.Confidence {
+					res = OCRResult{
+						Bounds:      box,
+						SourceImage: rImg,
+					}
+				}
+				break
+			}
 		}
 	}
 
-	if result == (Coords{}) {
-		return result, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
-	}
+	coords := b.GetCoords(res.Bounds.Box.Min.X+res.Bounds.Box.Dx()/2, res.Bounds.Box.Min.Y+res.Bounds.Box.Dy()/2, res.SourceImage)
 
-	return result, nil
+	return coords, nil
 }
 
 func (b *BlueStacks) GetCoordsFromCV(cvResult gcv.Result, screenImg image.Image) Coords {
@@ -195,15 +226,54 @@ func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 	return coords
 }
 
+// We have a process of resizing the search image to determine the result with the best confidence.
 func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, error) {
-	res := gcv.FindAllImg(searchImg, sourceImg)
-	if len(res) == 0 {
+	searchMat, _ := gocv.ImageToMatRGB(searchImg)
+	defer searchMat.Close()
+
+	// Produce multiple sizes for the search image
+	var res CVResult
+	for i := 0; i <= 9; i++ {
+		resizeWidth := int(math.Round(float64(sourceImg.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
+		rImg := imaging.Resize(sourceImg, resizeWidth, 0, imaging.Lanczos)
+		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
+		if rImg.Bounds().Dx() < searchImg.Bounds().Dx() {
+			break // Break the loop if the source image resize becomes smaller than the search image.
+		}
+		// Then process the results to determine the most common coordinate location on the sourceImg
+		srcMat, _ := gocv.ImageToMatRGB(rImg)
+		defer srcMat.Close()
+		if debugMode {
+			gcv.ImgWrite("./tmp/enhance-debug/"+strconv.FormatInt(currentTs, 10)+"/screen-resized-"+strconv.Itoa(int(time.Now().Unix()))+".jpg", rImg)
+		}
+		_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
+
+		r := CVResult{
+			Confidence:  confidence,
+			Point:       topLeftPoint,
+			SearchImage: searchImg,
+			SourceImage: rImg,
+		}
+
+		if r.Confidence > res.Confidence {
+			res = r
+		}
+	}
+
+	if res.Confidence == 0 {
 		return Coords{}, errors.New("Cannot find image inside of source image")
 	}
-	return b.GetCoordsFromCV(res[0], sourceImg), nil
+
+	coords := b.GetCoords(res.Point.X+res.SearchImage.Bounds().Dx()/2, res.Point.Y+res.SearchImage.Bounds().Dy()/2, res.SourceImage)
+
+	return coords, nil
 }
 
 func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image.Image) (Coords, error) {
 	searchImg, _, _ := robotgo.DecodeImg(imagePath)
-	return b.GetImageCoordsInImage(searchImg, sourceImg)
+	coords, err := b.GetImageCoordsInImage(searchImg, sourceImg)
+	if err != nil {
+		return coords, fmt.Errorf("%v: %s", err, imagePath)
+	}
+	return coords, nil
 }
