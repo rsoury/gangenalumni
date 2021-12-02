@@ -11,6 +11,13 @@ require (
 require (
 	github.com/Kagami/go-face v0.0.0-20210630145111-0c14797b4d0e // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/aws/aws-sdk-go v1.42.17 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.11.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.0.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/rekognition v1.11.2 // indirect
+	github.com/aws/smithy-go v1.9.0 // indirect
+	github.com/caarlos0/env v3.5.0+incompatible // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -19,6 +26,8 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20211111143520-d0d5ecc1a356 // indirect
 	github.com/gopherjs/gopherwasm v1.1.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/joho/godotenv v1.4.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/kr/text v0.1.0 // indirect
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect

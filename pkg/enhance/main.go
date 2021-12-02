@@ -11,6 +11,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -18,11 +20,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/Kagami/go-face"
+	"github.com/aws/aws-sdk-go-v2/service/rekognition"
+	"github.com/aws/aws-sdk-go-v2/service/rekognition/types"
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
@@ -30,7 +33,6 @@ import (
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
-	"gocv.io/x/gocv/contrib"
 )
 
 var (
@@ -47,9 +49,9 @@ var (
 func init() {
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Run the enhancement in debug mode. Will output images to tmp folder.")
 	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier.")
-	rootCmd.PersistentFlags().StringP("models", "m", "./data/dlib/models", "Path to local dlib models directory.")
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
+	rootCmd.PersistentFlags().Bool("index", false, "Index the source images before exeuction of the enhancement.")
 	_ = rootCmd.MarkFlagRequired("source")
 }
 
@@ -70,28 +72,12 @@ func ImageToBytes(img image.Image) ([]byte, error) {
 	return imgBytes, nil
 }
 
-func setupHashes() []contrib.ImgHashBase {
-	var hashes []contrib.ImgHashBase
-
-	hashes = append(hashes, contrib.PHash{})
-	hashes = append(hashes, contrib.AverageHash{})
-	hashes = append(hashes, contrib.BlockMeanHash{})
-	hashes = append(hashes, contrib.BlockMeanHash{Mode: contrib.BlockMeanHashMode1})
-	hashes = append(hashes, contrib.ColorMomentHash{})
-	// MarrHildreth has default parameters for alpha/scale
-	hashes = append(hashes, contrib.NewMarrHildrethHash())
-	// RadialVariance has default parameters too
-	hashes = append(hashes, contrib.NewRadialVarianceHash())
-
-	return hashes
-}
-
 func EnhanceAll(cmd *cli.Command, args []string) {
 	var err error
 
 	debugMode, _ = cmd.Flags().GetBool("debug")
+	indexMode, _ := cmd.Flags().GetBool("index")
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
-	dlibModelsDir, _ := cmd.Flags().GetString("models")
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	currentTsStr := strconv.FormatInt(currentTs, 10)
@@ -111,47 +97,56 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Fatalln("ERROR:", err)
 	}
 
+	// Setup Source Image Paths - Fetch all the image paths from the source directory
+	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*"))
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	// Index each face to an output directory
+	var imageIndex []map[string]string
+
+	// Setup AWS -- https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/rekognition
+	ctx := context.Background()
+	awsConfig := NewAWSEnvConfig()
+	awsClient := rekognition.New(
+		rekognition.Options{
+			Region: awsConfig.Region,
+		},
+	)
+	// Collection is determined by the step number + the timestamp of the image directory.
+	collectionId := "2-" + filepath.Base(strings.TrimSuffix(sourceDir, "/"))
+	if indexMode {
+		// Index the images in the source directory.
+		for _, imagePath := range sourceImagePaths {
+			img, _, _ := robotgo.DecodeImg(imagePath)
+			imgBytes, err := ImageToBytes(img)
+			if err != nil {
+				log.Fatalf("ERROR: Cannot convert image to bytes: %v - %v", imagePath, err.Error())
+			}
+			filename := filepath.Base(imagePath)
+			extension := filepath.Ext(filename)
+			name := filename[0 : len(filename)-len(extension)]
+			output, err := awsClient.IndexFaces(ctx, &rekognition.IndexFacesInput{
+				CollectionId: &collectionId,
+				Image: &types.Image{
+					Bytes: imgBytes,
+				},
+				ExternalImageId: &name,
+			})
+			if err != nil {
+				log.Fatalf("ERROR: Cannot index the image: %v - %v", imagePath, err.Error())
+			}
+			log.Printf("ID: %s - %d faces indexed, %d faces detected but dismissed\n", name, len(output.FaceRecords), len(output.UnindexedFaces))
+		}
+	}
+
+	// Setup Bluestacks
 	bluestacks := NewBlueStacks()
 
 	bluestacks.StartOCR()
 	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
-
-	// Index each face to an output directory
-	// var imageIndex []map[string]string
-	// Fetch all the images from the source directory
-	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*"))
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	// Init the dlib face recognizer.
-	q.Q(dlibModelsDir)
-	recognizer, err := face.NewRecognizer(dlibModelsDir)
-	if err != nil {
-		log.Fatal("ERROR: Cannot initiate dlib Face Recognizer")
-	}
-	defer recognizer.Close()
-	// Create a face database using the source files -- each file basename will be the "category" id
-	for _, sourceImagePath := range sourceImagePaths {
-		faces, err := recognizer.RecognizeFile(sourceImagePath)
-		if err != nil {
-			log.Fatalf("Cannot recognise face in image: %v - %v", sourceImagePath, err.Error())
-		}
-		if len(faces) != 1 {
-			log.Printf("Detected %d faces. Wrong number of faces detected: %v\n", len(faces), sourceImagePath)
-			continue
-		}
-		filename := filepath.Base(sourceImagePath)
-		extension := filepath.Ext(filename)
-		name := filename[0 : len(filename)-len(extension)]
-		nameInt64, _ := strconv.ParseInt(name, 10, 32)
-		nameInt32 := int32(nameInt64)
-		recognizer.SetSamples([]face.Descriptor{faces[0].Descriptor}, []int32{nameInt32})
-		q.Q(sourceImagePath, name, faces)
-	}
-
-	return
 
 	screenImg := robotgo.CaptureImg()
 	if debugMode {
@@ -213,14 +208,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	}
 	log.Printf("Found %d faces\n", len(detectedFaces))
 
-	// TODO: Create a map of original detected faces to the enhanced faces
 	// Add to the image index map
-
 	for i, rect := range detectedFaces {
 		// Run the enhancement process inside of this loop
+
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
-		q.Q(i, faceCoords)
 
 		if i > 0 { // TESTING...
 			continue
@@ -252,16 +245,50 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			continue
 		}
 
-		// 3. Once the face is detected, match it against the files in the source directory.
+		// 3. Once the face is detected, match it against the images in the source directory.
 		// -- Use the face that was detected before the click to enhance -- This prevents the zoom out requirement
 		detectedImg := imaging.Crop(screenImg, rect)
 		if debugMode {
-			gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
+			// gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%s/face-%d-%dx%d.jpg", currentTsStr, i, faceCoords.X, faceCoords.Y), detectedImg)
 		}
-		// for _, sourceImagePath := range sourceImagePaths {
-		// 	srcImg, _, _ := robotgo.DecodeImg(sourceImagePath)
+		detectedImgBytes, _ := ImageToBytes(detectedImg)
+		// AWS call for face search
+		searchResult, err := awsClient.SearchFacesByImage(ctx, &rekognition.SearchFacesByImageInput{
+			CollectionId: &collectionId,
+			Image: &types.Image{
+				Bytes: detectedImgBytes,
+			},
+		})
+		if err != nil {
+			log.Fatalf("ERROR: Failed to search for pre-enhanced detected image - %d-%dx%d - %v", i, faceCoords.X, faceCoords.Y, err.Error())
+		}
+		matchedFace := types.FaceMatch{}
+		for _, match := range searchResult.FaceMatches {
+			if *match.Similarity > *matchedFace.Similarity {
+				matchedFace = match
+			}
+		}
+		if *matchedFace.Similarity == 0 {
+			log.Fatalf("ERROR: No face matched for pre-enhanced detected image - %d-%dx%d - %v", i, faceCoords.X, faceCoords.Y, err.Error())
+		}
 
-		// }
+		// Now that we have the matched face, we can produce the enhancement, then detect the enhanced face to save against the matched image id.
+		imageId := *matchedFace.Face.ExternalImageId
+		// First, check if the image has already been enhanced
+		// 0. Check if the face has already been enhanced
+		alreadyEnhanced := false
+		for _, saveData := range imageIndex {
+			if saveData["id"] == imageId {
+				alreadyEnhanced = true
+			}
+		}
+
+		if !alreadyEnhanced {
+			// Run the enhancement process here.
+		}
+
+		// Use the back button to proceed with the next image
 	}
 
 	if debugMode {
