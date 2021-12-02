@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strconv"
 	"strings"
 	"time"
@@ -208,6 +207,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	}
 	bluestacks.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
 	robotgo.MilliSleep(1000) // Wait for the shared folder gallery to actually load
+	backControlCoords, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
 
 	// prepare image matrix
 	screenImg = robotgo.CaptureImg()
@@ -241,10 +244,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
-
-		if i > 0 { // TESTING...
-			continue
-		}
 
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
 		// 2. Wait for the face to appear
@@ -316,13 +315,21 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 		}
 
-		q.Q(alreadyEnhanced, imageId, matchedFace)
-
 		if !alreadyEnhanced {
 			// Run the enhancement process here.
+			// 1. Determine the enhancements
+			// 2. Iterate and apply the enhancements
+			// -- 1. Select enhancement
+			// -- 2. Wait for the processing text to no longer show
+			// -- 3. Select the Apply text
+			// -- 4. Select the Save text
+			// -- 5. Click the back button -- to get back to the Editor
+			// TODO: We can abstract reaching the gallery and moving out of the editor, and then cache the coords within the Bluestacks Type
 		}
 
 		// Use the back button to proceed with the next image
+		bluestacks.MoveClick(backControlCoords.X, backControlCoords.Y)
+		robotgo.MilliSleep(1000)
 	}
 
 	if debugMode {
