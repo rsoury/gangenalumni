@@ -28,6 +28,7 @@ import (
 	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
+	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 	"gocv.io/x/gocv/contrib"
 )
@@ -185,16 +186,17 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	// TODO: Create a map of original detected faces to the enhanced faces
 	// Add to the image index map
-	var simHash contrib.AverageHash
+	// var simHash contrib.AverageHash
 	for i, rect := range faces {
-		if i > 0 { // TESTING...
-			break
-		}
-
 		// Run the enhancement process inside of this loop
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
 		q.Q(i, faceCoords)
+
+		if i > 0 { // TESTING...
+			continue
+		}
+
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
 		// 2. Wait for the face to appear
 		count := 0
@@ -227,38 +229,46 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		if debugMode {
 			gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
 		}
-		dMat, _ := gocv.ImageToMatRGB(detectedImg)
-		if dMat.Empty() {
-			log.Fatalln("Cannot load image matrix for face")
-		}
-		defer dMat.Close()
-		dHash := gocv.NewMat()
-		defer dHash.Close()
-		simHash.Compute(dMat, &dHash)
-		if dHash.Empty() {
-			log.Println("Cannot compute hash for detected image")
-		}
-
+		dHash, dImageSize := images.Hash(detectedImg)
 		for _, sourceImagePath := range sourceImagePaths {
-			srcMat := gocv.IMRead(sourceImagePath, gocv.IMReadColor)
-			if srcMat.Empty() {
-				log.Printf("Cannot read image %s\n", sourceImagePath)
-			}
-			defer srcMat.Close()
-			srcHash := gocv.NewMat()
-			defer srcHash.Close()
-			// image similarity
-			simHash.Compute(srcMat, &srcHash)
-			if srcHash.Empty() {
-				log.Printf("Cannot compute hash for image %s\n", sourceImagePath)
-			}
-
-			// compare for similarity; this returns a float64, but the meaning of values is
-			// unique to each algorithm.
-			similar := simHash.Compare(dHash, srcHash)
-
-			q.Q(sourceImagePath, similar) // TODO: Test to find out if the actual image actually returns the highest similarity score.
+			srcImg, _, _ := robotgo.DecodeImg(sourceImagePath)
+			srcHash, srcImgSize := images.Hash(srcImg)
+			similar := images.Similar(dHash, srcHash, dImageSize, srcImgSize)
+			q.Q(sourceImagePath, similar)
 		}
+
+		// dMat, _ := gocv.ImageToMatRGB(detectedImg)
+		// if dMat.Empty() {
+		// 	log.Fatalln("Cannot load image matrix for face")
+		// }
+		// defer dMat.Close()
+		// dHash := gocv.NewMat()
+		// defer dHash.Close()
+		// simHash.Compute(dMat, &dHash)
+		// if dHash.Empty() {
+		// 	log.Println("Cannot compute hash for detected image")
+		// }
+
+		// for _, sourceImagePath := range sourceImagePaths {
+		// 	srcMat := gocv.IMRead(sourceImagePath, gocv.IMReadColor)
+		// 	if srcMat.Empty() {
+		// 		log.Printf("Cannot read image %s\n", sourceImagePath)
+		// 	}
+		// 	defer srcMat.Close()
+		// 	srcHash := gocv.NewMat()
+		// 	defer srcHash.Close()
+		// 	// image similarity
+		// 	simHash.Compute(srcMat, &srcHash)
+		// 	if srcHash.Empty() {
+		// 		log.Printf("Cannot compute hash for image %s\n", sourceImagePath)
+		// 	}
+
+		// 	// compare for similarity; this returns a float64, but the meaning of values is
+		// 	// unique to each algorithm.
+		// 	similar := simHash.Compare(dHash, srcHash)
+
+		// 	q.Q(sourceImagePath, similar) // TODO: Test to find out if the actual image actually returns the highest similarity score.
+		// }
 	}
 
 	if debugMode {
