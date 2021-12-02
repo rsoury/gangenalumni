@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
-	"github.com/oliamb/cutter"
 	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
@@ -155,6 +155,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Fatal("ERROR: ", err.Error())
 	}
 	bluestacks.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
+	robotgo.MilliSleep(1000) // Wait for the shared folder gallery to actually load
 
 	// prepare image matrix
 	screenImg = robotgo.CaptureImg()
@@ -185,10 +186,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	// TODO: Create a map of original detected faces to the enhanced faces
 	// Add to the image index map
 	var simHash contrib.AverageHash
-	for _, rect := range faces {
+	for i, rect := range faces {
+		if i > 0 { // TESTING...
+			break
+		}
+
 		// Run the enhancement process inside of this loop
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
+		q.Q(i, faceCoords)
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
 		// 2. Wait for the face to appear
 		count := 0
@@ -197,23 +203,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		for {
 			count++
 			robotgo.MilliSleep(1000)
-			sImg := robotgo.CaptureImg()
-			sMat, _ := gocv.ImageToMatRGB(sImg)
-			defer sMat.Close()
-			// // We should attempt to zoom out before running the detection... as the face is zoomed in by default
-			robotgo.MilliSleep(1000)
-			sRects := classifier.DetectMultiScale(sMat)
+			editorImg := robotgo.CaptureImg()
+			editorMat, _ := gocv.ImageToMatRGB(editorImg)
+			defer editorMat.Close()
+			sRects := classifier.DetectMultiScale(editorMat)
 			for _, r := range sRects {
 				if r.Dx() > 100 {
 					validRects = append(validRects, r)
 				}
 			}
-			// if len(validRects) > 0 {
-			// 	detectedScreenImg = sImg
-			// 	break
-			// } else if count > 10 {
-			// 	break
-			// }
 			if len(validRects) > 0 || count > 10 {
 				break
 			}
@@ -225,15 +223,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 		// 3. Once the face is detected, match it against the files in the source directory.
 		// -- Use the face that was detected before the click to enhance -- This prevents the zoom out requirement
-		detectedImg, _ := cutter.Crop(screenImg, cutter.Config{
-			Width:  rect.Dx(),
-			Height: rect.Dy(),
-			Anchor: image.Point{
-				X: rect.Min.X,
-				Y: rect.Min.Y,
-			},
-			Mode: cutter.TopLeft,
-		})
+		detectedImg := imaging.Crop(screenImg, rect)
+		if debugMode {
+			gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
+		}
 		dMat, _ := gocv.ImageToMatRGB(detectedImg)
 		if dMat.Empty() {
 			log.Fatalln("Cannot load image matrix for face")
