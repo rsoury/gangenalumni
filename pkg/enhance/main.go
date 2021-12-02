@@ -12,6 +12,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -20,10 +21,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"q"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition/types"
 	"github.com/disintegration/imaging"
@@ -108,14 +111,38 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	// Setup AWS -- https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/rekognition
 	ctx := context.Background()
 	awsConfig := NewAWSEnvConfig()
-	awsClient := rekognition.New(
-		rekognition.Options{
-			Region: awsConfig.Region,
-		},
-	)
+	// q.Q(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"))
+	awsNativeConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsConfig.Region))
+	if err != nil {
+		log.Fatalf("ERROR: Cannot load AWS config %v\n", err.Error())
+	}
+	awsClient := rekognition.NewFromConfig(awsNativeConfig)
+
 	// Collection is determined by the step number + the timestamp of the image directory.
-	collectionId := "2-" + filepath.Base(strings.TrimSuffix(sourceDir, "/"))
+	collectionId := "npcc-2-" + filepath.Base(strings.TrimSuffix(sourceDir, "/"))
 	if indexMode {
+		log.Printf("Indexing %d source images into collection %v ...\n", len(sourceImagePaths), collectionId)
+		// Check if the collection exists -- if not, create it
+		_, err := awsClient.DescribeCollection(ctx, &rekognition.DescribeCollectionInput{
+			CollectionId: &collectionId,
+		})
+		if err != nil {
+			var errorType *types.ResourceNotFoundException // https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/
+			if errors.As(err, &errorType) {
+				newCollection, err := awsClient.CreateCollection(ctx, &rekognition.CreateCollectionInput{
+					CollectionId: &collectionId,
+					Tags: map[string]string{
+						"Project": "NPC Companions",
+					},
+				})
+				if err != nil {
+					log.Fatalf("ERROR: Cannot create the collection %s - %v\n", collectionId, err.Error())
+				}
+				log.Printf("New collection %s created - %s\n", collectionId, *newCollection.CollectionArn)
+			} else {
+				log.Fatalf("ERROR: Cannot describe the collection %s - %v\n", collectionId, err.Error())
+			}
+		}
 		// Index the images in the source directory.
 		for _, imagePath := range sourceImagePaths {
 			img, _, _ := robotgo.DecodeImg(imagePath)
@@ -265,6 +292,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		}
 		matchedFace := types.FaceMatch{}
 		for _, match := range searchResult.FaceMatches {
+			// Check if nil, because a direct comparison will throw an exception
+			if matchedFace.Similarity == nil {
+				matchedFace = match
+				continue
+			}
 			if *match.Similarity > *matchedFace.Similarity {
 				matchedFace = match
 			}
@@ -283,6 +315,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				alreadyEnhanced = true
 			}
 		}
+
+		q.Q(alreadyEnhanced, imageId, matchedFace)
 
 		if !alreadyEnhanced {
 			// Run the enhancement process here.
