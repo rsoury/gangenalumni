@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Kagami/go-face"
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
 	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
-	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 	"gocv.io/x/gocv/contrib"
 )
@@ -47,6 +47,7 @@ var (
 func init() {
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Run the enhancement in debug mode. Will output images to tmp folder.")
 	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier.")
+	rootCmd.PersistentFlags().StringP("models", "m", "./data/dlib/models", "Path to local dlib models directory.")
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
 	_ = rootCmd.MarkFlagRequired("source")
@@ -90,6 +91,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	debugMode, _ = cmd.Flags().GetBool("debug")
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
+	dlibModelsDir, _ := cmd.Flags().GetString("models")
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	currentTsStr := strconv.FormatInt(currentTs, 10)
@@ -123,6 +125,33 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
+	// Init the dlib face recognizer.
+	q.Q(dlibModelsDir)
+	recognizer, err := face.NewRecognizer(dlibModelsDir)
+	if err != nil {
+		log.Fatal("ERROR: Cannot initiate dlib Face Recognizer")
+	}
+	defer recognizer.Close()
+	// Create a face database using the source files -- each file basename will be the "category" id
+	for _, sourceImagePath := range sourceImagePaths {
+		faces, err := recognizer.RecognizeFile(sourceImagePath)
+		if err != nil {
+			log.Fatalf("Cannot recognise face in image: %v - %v", sourceImagePath, err.Error())
+		}
+		if len(faces) != 1 {
+			log.Printf("Detected %d faces. Wrong number of faces detected: %v\n", len(faces), sourceImagePath)
+			continue
+		}
+		filename := filepath.Base(sourceImagePath)
+		extension := filepath.Ext(filename)
+		name := filename[0 : len(filename)-len(extension)]
+		nameInt64, _ := strconv.ParseInt(name, 10, 32)
+		nameInt32 := int32(nameInt64)
+		recognizer.SetSamples([]face.Descriptor{faces[0].Descriptor}, []int32{nameInt32})
+		q.Q(sourceImagePath, name, faces)
+	}
+
+	return
 
 	screenImg := robotgo.CaptureImg()
 	if debugMode {
@@ -176,18 +205,18 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	// detect faces
 	rects := classifier.DetectMultiScale(screenMat)
-	var faces []image.Rectangle
+	var detectedFaces []image.Rectangle
 	for _, r := range rects {
 		if r.Dx() > 100 {
-			faces = append(faces, r)
+			detectedFaces = append(detectedFaces, r)
 		}
 	}
-	log.Printf("Found %d faces\n", len(faces))
+	log.Printf("Found %d faces\n", len(detectedFaces))
 
 	// TODO: Create a map of original detected faces to the enhanced faces
 	// Add to the image index map
-	// var simHash contrib.AverageHash
-	for i, rect := range faces {
+
+	for i, rect := range detectedFaces {
 		// Run the enhancement process inside of this loop
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
@@ -229,52 +258,16 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		if debugMode {
 			gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
 		}
-		dHash, dImageSize := images.Hash(detectedImg)
-		for _, sourceImagePath := range sourceImagePaths {
-			srcImg, _, _ := robotgo.DecodeImg(sourceImagePath)
-			srcHash, srcImgSize := images.Hash(srcImg)
-			similar := images.Similar(dHash, srcHash, dImageSize, srcImgSize)
-			q.Q(sourceImagePath, similar)
-		}
-
-		// dMat, _ := gocv.ImageToMatRGB(detectedImg)
-		// if dMat.Empty() {
-		// 	log.Fatalln("Cannot load image matrix for face")
-		// }
-		// defer dMat.Close()
-		// dHash := gocv.NewMat()
-		// defer dHash.Close()
-		// simHash.Compute(dMat, &dHash)
-		// if dHash.Empty() {
-		// 	log.Println("Cannot compute hash for detected image")
-		// }
-
 		// for _, sourceImagePath := range sourceImagePaths {
-		// 	srcMat := gocv.IMRead(sourceImagePath, gocv.IMReadColor)
-		// 	if srcMat.Empty() {
-		// 		log.Printf("Cannot read image %s\n", sourceImagePath)
-		// 	}
-		// 	defer srcMat.Close()
-		// 	srcHash := gocv.NewMat()
-		// 	defer srcHash.Close()
-		// 	// image similarity
-		// 	simHash.Compute(srcMat, &srcHash)
-		// 	if srcHash.Empty() {
-		// 		log.Printf("Cannot compute hash for image %s\n", sourceImagePath)
-		// 	}
+		// 	srcImg, _, _ := robotgo.DecodeImg(sourceImagePath)
 
-		// 	// compare for similarity; this returns a float64, but the meaning of values is
-		// 	// unique to each algorithm.
-		// 	similar := simHash.Compare(dHash, srcHash)
-
-		// 	q.Q(sourceImagePath, similar) // TODO: Test to find out if the actual image actually returns the highest similarity score.
 		// }
 	}
 
 	if debugMode {
 		// draw a rectangle around each face on the original image,
 		// along with text identifing as "Human"
-		for _, r := range faces {
+		for _, r := range detectedFaces {
 			gocv.Rectangle(&screenMat, r, blue, 3)
 
 			size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
