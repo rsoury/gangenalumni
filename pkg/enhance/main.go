@@ -12,6 +12,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -36,6 +37,11 @@ import (
 	"gocv.io/x/gocv"
 )
 
+type IndexedImage struct {
+	Id                string `json:"id"`
+	EnhancedImagePath string `json:"enhancedImagePath"`
+}
+
 var (
 	// The Root Cli Handler
 	rootCmd = &cli.Command{
@@ -45,6 +51,8 @@ var (
 	}
 	currentTs = time.Now().Unix()
 	debugMode = false
+	// Index each face to an output directory
+	imageIndex []IndexedImage
 )
 
 func init() {
@@ -99,12 +107,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	}
 
 	// Setup Source Image Paths - Fetch all the image paths from the source directory
-	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*"))
+	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*.{jpeg,jpg,png}"))
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
-	// Index each face to an output directory
-	var imageIndex []map[string]string
 
 	// Setup AWS -- https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/rekognition
 	ctx := context.Background()
@@ -168,28 +174,31 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	// Setup Bluestacks
 	bluestacks := NewBlueStacks()
 
+	err = bluestacks.LoadFaceClassifier(cascadeFile)
+	if err != nil {
+		log.Fatalf("ERROR: %v", err.Error())
+	}
+	defer bluestacks.FaceClassifier.Close()
+
 	bluestacks.StartOCR()
 	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
 	screenImg := robotgo.CaptureImg()
-	if debugMode {
-		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
-	}
-
-	// These control coordinates only really need to be obtained once... and then reused accordingly.
-	err = bluestacks.MoveToSharedFolderFromHome()
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-
-	detectedFaces, detectionScreenMat := bluestacks.DetectFacesInScreen()
+	detectedFaces := bluestacks.DetectFaces(screenImg)
 	log.Printf("Found %d faces\n", len(detectedFaces))
 
 	// Add to the image index map
 	for i, rect := range detectedFaces {
 		// Run the enhancement process inside of this loop
+
+		// These control coordinates only really need to be obtained once... and then reused accordingly.
+		// For each of the faces -- return the gallery
+		err = bluestacks.MoveToSharedFolderFromHome()
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
 
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
@@ -198,11 +207,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// 2. Wait for the face to appear
 		count := 0
 		var validRects []image.Rectangle
-		// var detectedScreenImg image.Image
 		for {
 			count++
 			robotgo.MilliSleep(1000)
-			sRects, _ := bluestacks.DetectFacesInScreen()
+			sRects := bluestacks.DetectFaces(screenImg)
 			for _, r := range sRects {
 				if r.Dx() > 100 {
 					validRects = append(validRects, r)
@@ -255,9 +263,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// First, check if the image has already been enhanced
 		// 0. Check if the face has already been enhanced
 		alreadyEnhanced := false
-		for _, saveData := range imageIndex {
-			if saveData["id"] == imageId {
+		for _, indexedImage := range imageIndex {
+			if indexedImage.Id == imageId {
 				alreadyEnhanced = true
+				break
 			}
 		}
 
@@ -269,7 +278,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			// -- 2. Wait for the processing text to no longer show
 			// -- 3. Select the Apply text
 			// -- 4. Select the Save text
-			// -- 5. Click the back button -- to get back to the Editor
+			// -- 5. Detect the image inside of the Save Screen
+			// -- 6. Click the back button -- to get back to the Editor
+
+			imageIndex = append(imageIndex, IndexedImage{
+				Id:                imageId,
+				EnhancedImagePath: "",
+			})
 		}
 
 		// Use the back button to proceed with the next image
@@ -280,24 +295,47 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	}
 
 	if debugMode {
-		// color for the rect when faces detected
-		blue := color.RGBA{0, 0, 255, 0}
-		// draw a rectangle around each face on the original image,
-		// along with text identifing as "Human"
-		for _, r := range detectedFaces {
-			gocv.Rectangle(&detectionScreenMat, r, blue, 3)
+		go func() {
+			// color for the rect when faces detected
+			blue := color.RGBA{0, 0, 255, 0}
+			// draw a rectangle around each face on the original image,
+			// along with text identifing as "Human"
+			screenMat, _ := gocv.ImageToMatRGB(screenImg)
+			defer screenMat.Close()
+			for _, r := range detectedFaces {
+				gocv.Rectangle(&screenMat, r, blue, 3)
 
-			size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
-			pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
-			gocv.PutText(&detectionScreenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
-		}
+				size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
+				pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
+				gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+			}
 
-		if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", detectionScreenMat) {
-			log.Println("Successfully created image with faces detected")
-		} else {
-			log.Println("Failed to create image with faces detected")
-		}
+			if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", screenMat) {
+				log.Printf("Successfully created image with faces detected\n")
+			} else {
+				log.Printf("Failed to create image with faces detected\n")
+			}
+		}()
 	}
 
+	// Save Image Index to file
+	// https://www.socketloop.com/tutorials/golang-save-map-struct-to-json-or-xml-file
+	imageIndexJson, err := json.Marshal(imageIndex)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	jsonFile, err := os.Create(filepath.Join(outputDir, "index.json"))
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	defer jsonFile.Close()
+	_, err = jsonFile.Write(imageIndexJson)
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	jsonFile.Close()
+	log.Println("JSON data written to ", jsonFile.Name())
+
+	// Desktop notification of completion
 	_ = beeep.Notify("Automatically Animated", "Enhancement script is complete", "")
 }

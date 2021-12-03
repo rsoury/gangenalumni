@@ -98,14 +98,11 @@ func NewBlueStacks() *BlueStacks {
 
 func (b *BlueStacks) LoadFaceClassifier(cascadeFile string) error {
 	// load classifier to recognize faces
-	classifier := gocv.NewCascadeClassifier()
-	defer classifier.Close()
+	b.FaceClassifier = gocv.NewCascadeClassifier()
 
-	if !classifier.Load(cascadeFile) {
+	if !b.FaceClassifier.Load(cascadeFile) {
 		return fmt.Errorf("Error reading cascade file: %v\n", cascadeFile)
 	}
-
-	b.FaceClassifier = classifier
 
 	return nil
 }
@@ -255,6 +252,7 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 	for i := 0; i <= 9; i++ {
 		resizeWidth := int(math.Round(float64(sourceImg.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
 		rImg := imaging.Resize(sourceImg, resizeWidth, 0, imaging.Lanczos)
+		// fmt.Printf("Resizing image for width %d\n", resizeWidth)
 		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
 		if rImg.Bounds().Dx() < searchImg.Bounds().Dx() {
 			break // Break the loop if the source image resize becomes smaller than the search image.
@@ -263,7 +261,9 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 		srcMat, _ := gocv.ImageToMatRGB(rImg)
 		defer srcMat.Close()
 		if debugMode {
-			gcv.ImgWrite("./tmp/enhance-debug/"+strconv.FormatInt(currentTs, 10)+"/screen-resized-"+strconv.Itoa(int(time.Now().Unix()))+".jpg", rImg)
+			go func() {
+				gcv.ImgWrite("./tmp/enhance-debug/"+strconv.FormatInt(currentTs, 10)+"/screen-resized-"+strconv.Itoa(int(time.Now().Unix()))+".jpg", rImg)
+			}()
 		}
 		_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
 
@@ -297,10 +297,9 @@ func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image
 	return coords, nil
 }
 
-func (b *BlueStacks) DetectFacesInScreen() ([]image.Rectangle, gocv.Mat) {
+func (b *BlueStacks) DetectFaces(img image.Image) []image.Rectangle {
 	// prepare image matrix
-	screenImg := robotgo.CaptureImg()
-	screenMat, _ := gocv.ImageToMatRGB(screenImg)
+	screenMat, _ := gocv.ImageToMatRGB(img)
 	defer screenMat.Close()
 
 	// detect faces
@@ -312,7 +311,7 @@ func (b *BlueStacks) DetectFacesInScreen() ([]image.Rectangle, gocv.Mat) {
 		}
 	}
 
-	return detectedFaces, screenMat
+	return detectedFaces
 }
 
 // Some Screen Movement Functions
@@ -326,7 +325,9 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 	} else {
 		screenImg := robotgo.CaptureImg()
 		if debugMode {
-			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-0.jpg", currentTs), screenImg)
+			go func() {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-0.jpg", currentTs), screenImg)
+			}()
 		}
 		galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
 		if err != nil {
@@ -343,7 +344,9 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 	} else {
 		screenImg := robotgo.CaptureImg()
 		if debugMode {
-			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-1.jpg", currentTs), screenImg)
+			go func() {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-1.jpg", currentTs), screenImg)
+			}()
 		}
 		folderFilterControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
 		if err != nil {
@@ -360,7 +363,9 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 	} else {
 		screenImg := robotgo.CaptureImg()
 		if debugMode {
-			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-2.jpg", currentTs), screenImg)
+			go func() {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-2.jpg", currentTs), screenImg)
+			}()
 		}
 		sharedFolderControlCoords, err = b.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
 		if err != nil {
