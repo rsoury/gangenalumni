@@ -31,11 +31,12 @@ type Bounds struct {
 }
 
 type BlueStacks struct {
-	OCRClient    *gosseract.Client
-	ActivePID    int32
-	ScreenWidth  int
-	ScreenHeight int
-	CenterCoords *Coords
+	OCRClient      *gosseract.Client
+	ActivePID      int32
+	ScreenWidth    int
+	ScreenHeight   int
+	CenterCoords   *Coords
+	FaceClassifier gocv.CascadeClassifier
 }
 
 type CVResult struct {
@@ -48,6 +49,10 @@ type OCRResult struct {
 	Bounds      gosseract.BoundingBox
 	SourceImage image.Image
 }
+
+var (
+	coordsCache = map[string]Coords{}
+)
 
 func NewBlueStacks() *BlueStacks {
 	processName := "BlueStacks"
@@ -89,6 +94,20 @@ func NewBlueStacks() *BlueStacks {
 	}
 
 	return bluestacks
+}
+
+func (b *BlueStacks) LoadFaceClassifier(cascadeFile string) error {
+	// load classifier to recognize faces
+	classifier := gocv.NewCascadeClassifier()
+	defer classifier.Close()
+
+	if !classifier.Load(cascadeFile) {
+		return fmt.Errorf("Error reading cascade file: %v\n", cascadeFile)
+	}
+
+	b.FaceClassifier = classifier
+
+	return nil
 }
 
 func (b *BlueStacks) StartOCR() {
@@ -276,4 +295,101 @@ func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image
 		return coords, fmt.Errorf("%v: %s", err, imagePath)
 	}
 	return coords, nil
+}
+
+func (b *BlueStacks) DetectFacesInScreen() ([]image.Rectangle, gocv.Mat) {
+	// prepare image matrix
+	screenImg := robotgo.CaptureImg()
+	screenMat, _ := gocv.ImageToMatRGB(screenImg)
+	defer screenMat.Close()
+
+	// detect faces
+	rects := b.FaceClassifier.DetectMultiScale(screenMat)
+	var detectedFaces []image.Rectangle
+	for _, r := range rects {
+		if r.Dx() > 100 {
+			detectedFaces = append(detectedFaces, r)
+		}
+	}
+
+	return detectedFaces, screenMat
+}
+
+// Some Screen Movement Functions
+func (b *BlueStacks) MoveToSharedFolderFromHome() error {
+	b.ScrollUp(50) // Scroll up to ensure that gallery button shows.
+
+	var err error
+	var galleryControlCoords Coords
+	if v, found := coordsCache["gallery"]; found {
+		galleryControlCoords = v
+	} else {
+		screenImg := robotgo.CaptureImg()
+		if debugMode {
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-0.jpg", currentTs), screenImg)
+		}
+		galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
+		if err != nil {
+			return err
+		}
+		coordsCache["gallery"] = galleryControlCoords
+	}
+	b.MoveClick(galleryControlCoords.X, galleryControlCoords.Y)
+	robotgo.MilliSleep(1000) // Wait for animation to finish
+
+	var folderFilterControlCoords Coords
+	if v, found := coordsCache["filterFolder"]; found {
+		folderFilterControlCoords = v
+	} else {
+		screenImg := robotgo.CaptureImg()
+		if debugMode {
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-1.jpg", currentTs), screenImg)
+		}
+		folderFilterControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
+		if err != nil {
+			return err
+		}
+		coordsCache["filterFolder"] = folderFilterControlCoords
+	}
+	b.MoveClick(folderFilterControlCoords.X, folderFilterControlCoords.Y)
+	robotgo.MilliSleep(1000) // Wait for animation to finish
+
+	var sharedFolderControlCoords Coords
+	if v, found := coordsCache["sharedFolder"]; found {
+		sharedFolderControlCoords = v
+	} else {
+		screenImg := robotgo.CaptureImg()
+		if debugMode {
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-2.jpg", currentTs), screenImg)
+		}
+		sharedFolderControlCoords, err = b.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
+		if err != nil {
+			return err
+		}
+		coordsCache["sharedFolder"] = sharedFolderControlCoords
+	}
+	b.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
+	robotgo.MilliSleep(1000) // Wait for the shared folder gallery to actually load
+
+	return nil
+}
+
+func (b *BlueStacks) OsBackClick() error {
+	var err error
+	var backControlCoords Coords
+	if v, found := coordsCache["osback"]; found {
+		backControlCoords = v
+	} else {
+		screenImg := robotgo.CaptureImg()
+		backControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
+		if err != nil {
+			return err
+		}
+		coordsCache["osback"] = backControlCoords
+	}
+
+	b.MoveClick(backControlCoords.X, backControlCoords.Y)
+	robotgo.MilliSleep(1000)
+
+	return nil
 }

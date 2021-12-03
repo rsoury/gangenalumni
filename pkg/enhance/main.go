@@ -31,7 +31,6 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
-	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
@@ -179,63 +178,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-0.jpg", screenImg)
 	}
 
-	//* These control coordinates only really need to be obtained once... and then reused accordingly.
-	bluestacks.ScrollUp(50) // Scroll up to ensure that gallery button shows.
-	galleryControlCoords, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	bluestacks.MoveClick(galleryControlCoords.X, galleryControlCoords.Y)
-	robotgo.MilliSleep(1000) // Wait for animation to finish
-	screenImg = robotgo.CaptureImg()
-	if debugMode {
-		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-1.jpg", screenImg)
-	}
-	folderFilterControlCoords, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	bluestacks.MoveClick(folderFilterControlCoords.X, folderFilterControlCoords.Y)
-	robotgo.MilliSleep(1000) // Wait for animation to finish
-	screenImg = robotgo.CaptureImg()
-	if debugMode {
-		gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/screen-2.jpg", screenImg)
-	}
-	sharedFolderControlCoords, err := bluestacks.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	bluestacks.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
-	robotgo.MilliSleep(1000) // Wait for the shared folder gallery to actually load
-	backControlCoords, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
+	// These control coordinates only really need to be obtained once... and then reused accordingly.
+	err = bluestacks.MoveToSharedFolderFromHome()
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
 
-	// prepare image matrix
-	screenImg = robotgo.CaptureImg()
-	screenMat, _ := gocv.ImageToMatRGB(screenImg)
-	defer screenMat.Close()
-
-	// color for the rect when faces detected
-	blue := color.RGBA{0, 0, 255, 0}
-
-	// load classifier to recognize faces
-	classifier := gocv.NewCascadeClassifier()
-	defer classifier.Close()
-
-	if !classifier.Load(cascadeFile) {
-		log.Fatalf("Error reading cascade file: %v\n", cascadeFile)
-	}
-
-	// detect faces
-	rects := classifier.DetectMultiScale(screenMat)
-	var detectedFaces []image.Rectangle
-	for _, r := range rects {
-		if r.Dx() > 100 {
-			detectedFaces = append(detectedFaces, r)
-		}
-	}
+	detectedFaces, detectionScreenMat := bluestacks.DetectFacesInScreen()
 	log.Printf("Found %d faces\n", len(detectedFaces))
 
 	// Add to the image index map
@@ -244,8 +193,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
-
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
+
 		// 2. Wait for the face to appear
 		count := 0
 		var validRects []image.Rectangle
@@ -253,10 +202,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		for {
 			count++
 			robotgo.MilliSleep(1000)
-			editorImg := robotgo.CaptureImg()
-			editorMat, _ := gocv.ImageToMatRGB(editorImg)
-			defer editorMat.Close()
-			sRects := classifier.DetectMultiScale(editorMat)
+			sRects, _ := bluestacks.DetectFacesInScreen()
 			for _, r := range sRects {
 				if r.Dx() > 100 {
 					validRects = append(validRects, r)
@@ -324,26 +270,29 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			// -- 3. Select the Apply text
 			// -- 4. Select the Save text
 			// -- 5. Click the back button -- to get back to the Editor
-			// TODO: We can abstract reaching the gallery and moving out of the editor, and then cache the coords within the Bluestacks Type
 		}
 
 		// Use the back button to proceed with the next image
-		bluestacks.MoveClick(backControlCoords.X, backControlCoords.Y)
-		robotgo.MilliSleep(1000)
+		err = bluestacks.OsBackClick()
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
 	}
 
 	if debugMode {
+		// color for the rect when faces detected
+		blue := color.RGBA{0, 0, 255, 0}
 		// draw a rectangle around each face on the original image,
 		// along with text identifing as "Human"
 		for _, r := range detectedFaces {
-			gocv.Rectangle(&screenMat, r, blue, 3)
+			gocv.Rectangle(&detectionScreenMat, r, blue, 3)
 
 			size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
 			pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
-			gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+			gocv.PutText(&detectionScreenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
 		}
 
-		if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", screenMat) {
+		if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", detectionScreenMat) {
 			log.Println("Successfully created image with faces detected")
 		} else {
 			log.Println("Failed to create image with faces detected")
