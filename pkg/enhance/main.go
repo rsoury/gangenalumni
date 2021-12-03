@@ -288,12 +288,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		if !alreadyEnhanced {
 			// Run the enhancement process here.
 			// 1. Determine the enhancements
-			/**
-			* 1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
-			* 2. Check if user has glasses -- add glasses -- random selection
-			* 3. Check if female, and probability for make up -- add make up -- random selection
-			* 4. Plus size the person by chance too -- there should be heavier people.
-			 */
+			// -- 1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
+			// -- 2. Check if user has glasses -- add glasses -- random selection
+			// -- 3. Check if female, and probability for make up -- add make up -- random selection
+			// -- 4. Plus size the person by chance too -- there should be heavier people.
 			// 2. Iterate and apply the enhancements
 			// -- 1. Select enhancement
 			// -- 2. Wait for the processing text to no longer show
