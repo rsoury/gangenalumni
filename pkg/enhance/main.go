@@ -18,10 +18,12 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
+	"q"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +44,10 @@ type IndexedImage struct {
 	EnhancedImagePath string `json:"enhancedImagePath"`
 }
 
+type FaceData struct {
+	FaceDetails types.FaceDetail `json:"FaceDetails"`
+}
+
 var (
 	// The Root Cli Handler
 	rootCmd = &cli.Command{
@@ -60,8 +66,10 @@ func init() {
 	rootCmd.PersistentFlags().StringP("cascade-file", "c", "", "Path to local cascaseFile used for OpenCV FaceDetect Classifier.")
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
+	rootCmd.PersistentFlags().StringP("facedata", "f", "", "Path to AWS Face Analysis dataset directory.")
 	rootCmd.PersistentFlags().Bool("index", false, "Index the source images before exeuction of the enhancement.")
 	_ = rootCmd.MarkFlagRequired("source")
+	_ = rootCmd.MarkFlagRequired("facedata")
 }
 
 func main() {
@@ -89,6 +97,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
+	facedataDir, _ := cmd.Flags().GetString("facedata")
 	currentTsStr := strconv.FormatInt(currentTs, 10)
 	if debugMode {
 		err = os.MkdirAll("./tmp/enhance-debug/"+currentTsStr, 0755) // Create tmp dir for this debug dump
@@ -108,6 +117,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	// Setup Source Image Paths - Fetch all the image paths from the source directory
 	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*.{jpeg,jpg,png}"))
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+
+	// Setup Face Analysis Data Paths - Fetch all the JSON paths from the facedata directory
+	facedataPaths, err := filepath.Glob(path.Join(facedataDir, "/*.json"))
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
@@ -273,6 +288,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		if !alreadyEnhanced {
 			// Run the enhancement process here.
 			// 1. Determine the enhancements
+			/**
+			* 1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
+			* 2. Check if user has glasses -- add glasses -- random selection
+			* 3. Check if female, and probability for make up -- add make up -- random selection
+			* 4. Plus size the person by chance too -- there should be heavier people.
+			 */
 			// 2. Iterate and apply the enhancements
 			// -- 1. Select enhancement
 			// -- 2. Wait for the processing text to no longer show
@@ -280,6 +301,21 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			// -- 4. Select the Save text
 			// -- 5. Detect the image inside of the Save Screen
 			// -- 6. Click the back button -- to get back to the Editor
+
+			var facedata FaceData
+			for _, facedataPath := range facedataPaths {
+				filename := filepath.Base(facedataPath)
+				extension := filepath.Ext(filename)
+				name := filename[0 : len(filename)-len(extension)]
+				if name == imageId {
+					// Read the file and unmarshal the data
+					file, _ := ioutil.ReadFile(facedataPath)
+					_ = json.Unmarshal([]byte(file), &facedata)
+					break
+				}
+			}
+
+			q.Q(facedata)
 
 			imageIndex = append(imageIndex, IndexedImage{
 				Id:                imageId,
