@@ -7,6 +7,7 @@
 	"license": "UNLICENSED",
 	"private": true,
 	"scripts": {
+		"datasets": "node ./scripts/produce-datasets",
 		"enhance": "./bin/enhance",
 		"accessorise": "node ./scripts/avatar-accessorise",
 		"modulate": "node ./scripts/avatar-modulate",
