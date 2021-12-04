@@ -24,4 +24,5 @@ output
 dist
 build
 bin
-data/aws
+data/aws/*
+!data/aws/.gitkeep

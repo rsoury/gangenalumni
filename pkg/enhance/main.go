@@ -45,7 +45,7 @@ type IndexedImage struct {
 }
 
 type FaceData struct {
-	FaceDetails types.FaceDetail `json:"FaceDetails"`
+	FaceDetails []types.FaceDetail `json:"FaceDetails"`
 }
 
 var (
@@ -98,9 +98,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	facedataDir, _ := cmd.Flags().GetString("facedata")
-	currentTsStr := strconv.FormatInt(currentTs, 10)
 	if debugMode {
-		err = os.MkdirAll("./tmp/enhance-debug/"+currentTsStr, 0755) // Create tmp dir for this debug dump
+		err = os.MkdirAll(fmt.Sprintf("./tmp/enhance-debug/%d", currentTs), 0755) // Create tmp dir for this debug dump
 		if err != nil {
 			log.Fatalln("ERROR:", err)
 		}
@@ -109,6 +108,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Println("Start enhancement...")
 	}
 	// Create output directory
+	currentTsStr := strconv.FormatInt(currentTs, 10)
 	outputDir := path.Join(outputParentDir, currentTsStr)
 	err = os.MkdirAll(outputDir, 0755)
 	if err != nil {
@@ -200,20 +200,32 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
-	screenImg := robotgo.CaptureImg()
-	detectedFaces := bluestacks.DetectFaces(screenImg)
-	log.Printf("Found %d faces\n", len(detectedFaces))
-
-	// Add to the image index map
-	for i, rect := range detectedFaces {
-		// Run the enhancement process inside of this loop
-
+	var detectedFaces []image.Rectangle
+	var screenImg image.Image
+	i := 0
+	for {
 		// These control coordinates only really need to be obtained once... and then reused accordingly.
 		// For each of the faces -- return the gallery
 		err = bluestacks.MoveToSharedFolderFromHome()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
+
+		// Detect or iterate over the next face
+		var rect image.Rectangle
+		if len(detectedFaces) == 0 {
+			screenImg = robotgo.CaptureImg()
+			detectedFaces = bluestacks.DetectFaces(screenImg)
+			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), i)
+		}
+		// if len(detectedFaces) > 0 {
+		// } else {
+		// 	log.Fatalf("ERROR: No detected faces to process in screen %d\n", i)
+		// }
+		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
+		q.Q(rect)
+
+		// Run the enhancement process inside of this loop
 
 		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
@@ -224,7 +236,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		var validRects []image.Rectangle
 		for {
 			count++
-			robotgo.MilliSleep(1000)
+			robotgo.MilliSleep(2000)
 			sRects := bluestacks.DetectFaces(screenImg)
 			for _, r := range sRects {
 				if r.Dx() > 100 {
@@ -245,7 +257,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		detectedImg := imaging.Crop(screenImg, rect)
 		if debugMode {
 			// gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
-			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%s/face-%d-%dx%d.jpg", currentTsStr, i, faceCoords.X, faceCoords.Y), detectedImg)
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-%dx%d.jpg", currentTs, i, faceCoords.X, faceCoords.Y), detectedImg)
 		}
 		detectedImgBytes, _ := ImageToBytes(detectedImg)
 		// AWS call for face search
@@ -300,7 +312,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			// -- 5. Detect the image inside of the Save Screen
 			// -- 6. Click the back button -- to get back to the Editor
 
-			var facedata FaceData
+			// facedataMap := map[string]interface{}{}
+			facedata := FaceData{}
 			for _, facedataPath := range facedataPaths {
 				filename := filepath.Base(facedataPath)
 				extension := filepath.Ext(filename)
@@ -308,6 +321,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				if name == imageId {
 					// Read the file and unmarshal the data
 					file, _ := ioutil.ReadFile(facedataPath)
+					// _ = json.Unmarshal([]byte(file), &facedataMap)
+					// err := mapstructure.Decode(facedataMap, &facedata)
+					// if err != nil {
+					// 	log.Printf("ERROR: Cannot unmarshal face data into structure: %v", err.Error())
+					// }
 					_ = json.Unmarshal([]byte(file), &facedata)
 					break
 				}
@@ -321,35 +339,46 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			})
 		}
 
-		// Use the back button to proceed with the next image
+		// Use the back button to return to the Home Screen
 		err = bluestacks.OsBackClick()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
-	}
 
-	if debugMode {
-		go func() {
-			// color for the rect when faces detected
-			blue := color.RGBA{0, 0, 255, 0}
-			// draw a rectangle around each face on the original image,
-			// along with text identifing as "Human"
-			screenMat, _ := gocv.ImageToMatRGB(screenImg)
-			defer screenMat.Close()
-			for _, r := range detectedFaces {
-				gocv.Rectangle(&screenMat, r, blue, 3)
+		// Iterate the count
+		i++
 
-				size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
-				pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
-				gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+		if len(detectedFaces) == 0 {
+			// Here we'd scroll depending on whether a scroll is required.
+			// If we cannot scroll anymore, break the loop
+			if i > 0 { // Test -- If not the first iteration AND detectedFaces is empty.
+				break
 			}
 
-			if gocv.IMWrite("./tmp/enhance-debug/"+currentTsStr+"/face-detect.jpg", screenMat) {
-				log.Printf("Successfully created image with faces detected\n")
-			} else {
-				log.Printf("Failed to create image with faces detected\n")
+			if debugMode {
+				go func() {
+					// color for the rect when faces detected
+					blue := color.RGBA{0, 0, 255, 0}
+					// draw a rectangle around each face on the original image,
+					// along with text identifing as "Human"
+					screenMat, _ := gocv.ImageToMatRGB(screenImg)
+					defer screenMat.Close()
+					for _, r := range detectedFaces {
+						gocv.Rectangle(&screenMat, r, blue, 3)
+
+						size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
+						pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
+						gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+					}
+
+					if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-%d.jpg", currentTs, i), screenMat) {
+						log.Printf("Successfully created image with faces detected\n")
+					} else {
+						log.Printf("Failed to create image with faces detected\n")
+					}
+				}()
 			}
-		}()
+		}
 	}
 
 	// Save Image Index to file
