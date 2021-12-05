@@ -6,7 +6,7 @@ import (
 	"image"
 	"log"
 	"math"
-	"strconv"
+	"q"
 	"strings"
 	"time"
 
@@ -53,6 +53,10 @@ type OCRResult struct {
 var (
 	coordsCache = map[string]Coords{}
 )
+
+func init() {
+	robotgo.KeySleep = 100
+}
 
 func NewBlueStacks() *BlueStacks {
 	processName := "BlueStacks"
@@ -181,7 +185,7 @@ func (b *BlueStacks) GetBounds() Bounds {
 	}
 }
 
-func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level gosseract.PageIteratorLevel) (Coords, error) {
+func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image) (Coords, error) {
 	// Produce multiple sizes for the search image
 	var res OCRResult
 	for i := 0; i <= 9; i++ {
@@ -189,9 +193,11 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 		rImg := imaging.Resize(img, resizeWidth, 0, imaging.Lanczos)
 		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
 		rMat, _ := gocv.ImageToMatRGB(rImg)
-
 		// Seems greyscaling the image help with OCR.
-		gocv.CvtColor(rMat, &rMat, gocv.ColorBGRAToGray)
+		gocv.CvtColor(rMat, &rMat, gocv.ColorBGRToGray)
+
+		// We need to produce a mat with intensified text
+		// https://answers.opencv.org/question/237967/how-to-darken-faintdim-gray-text/
 
 		imgBytes, err := ImageToBytes(img)
 		if err != nil {
@@ -199,12 +205,21 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 		}
 		_ = b.OCRClient.SetImageFromBytes(imgBytes)
 
-		boxes, err := b.OCRClient.GetBoundingBoxes(level)
+		boxes, err := b.OCRClient.GetBoundingBoxes(gosseract.RIL_WORD)
+		// TEST
+		for _, box := range boxes {
+			if strings.Contains(box.Word, text) {
+				q.Q(text, box)
+			} else {
+				q.Q(text, box.Word)
+			}
+		}
+
 		if err != nil {
 			return Coords{}, err
 		}
 		if len(boxes) == 0 {
-			return Coords{}, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
+			return Coords{}, errors.New("Cannot find text on screen")
 		}
 
 		for _, box := range boxes {
@@ -221,7 +236,7 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 	}
 
 	if res == (OCRResult{}) {
-		return Coords{}, errors.New("Text found, but cannot specify the FaceApp '" + text + "' Text using OCR")
+		return Coords{}, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
 	}
 
 	coords := b.GetCoords(res.Bounds.Box.Min.X+res.Bounds.Box.Dx()/2, res.Bounds.Box.Min.Y+res.Bounds.Box.Dy()/2, res.SourceImage)
@@ -229,13 +244,13 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 	return coords, nil
 }
 
-func (b *BlueStacks) GetTextCoordsInImageWithCache(text string, img image.Image, level gosseract.PageIteratorLevel, cacheKey string) (Coords, error) {
+func (b *BlueStacks) GetTextCoordsInImageWithCache(text string, img image.Image, cacheKey string) (Coords, error) {
 	var coords Coords
 	var err error
 	if v, found := coordsCache[cacheKey]; found {
 		coords = v
 	} else {
-		coords, err = b.GetTextCoordsInImage(text, img, level)
+		coords, err = b.GetTextCoordsInImage(text, img)
 		if err != nil {
 			return coords, err
 		}
@@ -281,7 +296,7 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 		defer srcMat.Close()
 		if debugMode {
 			go func() {
-				gcv.ImgWrite("./tmp/enhance-debug/"+strconv.FormatInt(currentTs, 10)+"/screen-resized-"+strconv.Itoa(int(time.Now().Unix()))+".jpg", rImg)
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-resized-%d.jpg", currentTs, time.Now().Unix()), rImg)
 			}()
 		}
 		_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
@@ -376,23 +391,29 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 	b.MoveClick(folderFilterControlCoords.X, folderFilterControlCoords.Y)
 	robotgo.MilliSleep(1000) // Wait for animation to finish
 
-	var sharedFolderControlCoords Coords
-	if v, found := coordsCache["sharedFolder"]; found {
-		sharedFolderControlCoords = v
-	} else {
-		screenImg := robotgo.CaptureImg()
-		if debugMode {
-			go func() {
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-2.jpg", currentTs), screenImg)
-			}()
-		}
-		sharedFolderControlCoords, err = b.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
-		if err != nil {
-			return err
-		}
-		coordsCache["sharedFolder"] = sharedFolderControlCoords
-	}
-	b.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
+	// var sharedFolderControlCoords Coords
+	// if v, found := coordsCache["sharedFolder"]; found {
+	// 	sharedFolderControlCoords = v
+	// } else {
+	// 	screenImg := robotgo.CaptureImg()
+	// 	if debugMode {
+	// 		go func() {
+	// 			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-2.jpg", currentTs), screenImg)
+	// 		}()
+	// 	}
+	// 	sharedFolderControlCoords, err = b.GetTextCoordsInImage("SharedFolder", screenImg, gosseract.RIL_WORD)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	coordsCache["sharedFolder"] = sharedFolderControlCoords
+	// }
+	// b.MoveClick(sharedFolderControlCoords.X, sharedFolderControlCoords.Y)
+	//* Opting for a Hotkey approach to minimise room for error
+	robotgo.KeyTap("down")
+	robotgo.KeyTap("down")
+	robotgo.KeyTap("down")
+	robotgo.KeyTap("enter")
+	robotgo.KeyTap("tab")
 	robotgo.MilliSleep(1000) // Wait for the shared folder gallery to actually load
 
 	return nil

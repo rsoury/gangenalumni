@@ -10,14 +10,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -26,7 +23,6 @@ import (
 	"path/filepath"
 	"q"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -35,15 +31,15 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
-	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
 )
 
 type IndexedImage struct {
-	Id                string `json:"id"`
-	EnhancedImagePath string `json:"enhancedImagePath"`
+	Id                string              `json:"id"`
+	Enhancements      []map[string]string `json:"enhancements"`
+	EnhancedImagePath string              `json:"enhancedImagePath"`
 }
 
 type FaceData struct {
@@ -69,7 +65,6 @@ func init() {
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
 	rootCmd.PersistentFlags().StringP("facedata", "f", "", "Path to AWS Face Analysis dataset directory.")
-	rootCmd.PersistentFlags().Bool("index", false, "Index the source images before exeuction of the enhancement.")
 	_ = rootCmd.MarkFlagRequired("source")
 	_ = rootCmd.MarkFlagRequired("facedata")
 }
@@ -81,21 +76,10 @@ func main() {
 	}
 }
 
-func ImageToBytes(img image.Image) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, img, nil)
-	if err != nil {
-		return buf.Bytes(), err
-	}
-	imgBytes := buf.Bytes()
-	return imgBytes, nil
-}
-
 func EnhanceAll(cmd *cli.Command, args []string) {
 	var err error
 
 	debugMode, _ = cmd.Flags().GetBool("debug")
-	indexMode, _ := cmd.Flags().GetBool("index")
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
@@ -116,12 +100,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	if err != nil {
 		log.Fatalln("ERROR:", err)
 	}
-
-	// Setup Source Image Paths - Fetch all the image paths from the source directory
-	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*.{jpeg,jpg,png}"))
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
+	collectionId := getCollectionId(sourceDir)
 
 	// Setup Face Analysis Data Paths - Fetch all the JSON paths from the facedata directory
 	facedataPaths, err := filepath.Glob(path.Join(facedataDir, "/*.json"))
@@ -138,55 +117,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Fatalf("ERROR: Cannot load AWS config %v\n", err.Error())
 	}
 	awsClient := rekognition.NewFromConfig(awsNativeConfig)
-
-	// Collection is determined by the step number + the timestamp of the image directory.
-	collectionId := "npcc-2-" + filepath.Base(strings.TrimSuffix(sourceDir, "/"))
-	if indexMode {
-		log.Printf("Indexing %d source images into collection %v ...\n", len(sourceImagePaths), collectionId)
-		// Check if the collection exists -- if not, create it
-		_, err := awsClient.DescribeCollection(ctx, &rekognition.DescribeCollectionInput{
-			CollectionId: &collectionId,
-		})
-		if err != nil {
-			var errorType *types.ResourceNotFoundException // https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/
-			if errors.As(err, &errorType) {
-				newCollection, err := awsClient.CreateCollection(ctx, &rekognition.CreateCollectionInput{
-					CollectionId: &collectionId,
-					Tags: map[string]string{
-						"Project": "NPC Companions",
-					},
-				})
-				if err != nil {
-					log.Fatalf("ERROR: Cannot create the collection %s - %v\n", collectionId, err.Error())
-				}
-				log.Printf("New collection %s created - %s\n", collectionId, *newCollection.CollectionArn)
-			} else {
-				log.Fatalf("ERROR: Cannot describe the collection %s - %v\n", collectionId, err.Error())
-			}
-		}
-		// Index the images in the source directory.
-		for _, imagePath := range sourceImagePaths {
-			img, _, _ := robotgo.DecodeImg(imagePath)
-			imgBytes, err := ImageToBytes(img)
-			if err != nil {
-				log.Fatalf("ERROR: Cannot convert image to bytes: %v - %v", imagePath, err.Error())
-			}
-			filename := filepath.Base(imagePath)
-			extension := filepath.Ext(filename)
-			name := filename[0 : len(filename)-len(extension)]
-			output, err := awsClient.IndexFaces(ctx, &rekognition.IndexFacesInput{
-				CollectionId: &collectionId,
-				Image: &types.Image{
-					Bytes: imgBytes,
-				},
-				ExternalImageId: &name,
-			})
-			if err != nil {
-				log.Fatalf("ERROR: Cannot index the image: %v - %v", imagePath, err.Error())
-			}
-			log.Printf("ID: %s - %d faces indexed, %d faces detected but dismissed\n", name, len(output.FaceRecords), len(output.UnindexedFaces))
-		}
-	}
 
 	// Setup Bluestacks
 	bluestacks := NewBlueStacks()
@@ -322,6 +252,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 			faceDetails := facedata.FaceDetails[0]
 
+			enhancementsApplied := []map[string]string{}
 			for _, enhancement := range enhancements {
 				applyEnhancement := false
 				eType := EnhancementType{}
@@ -379,30 +310,41 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 				// proceed with enhancement
 				editorScreenImg := robotgo.CaptureImg()
-				eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-%s", enhancement.Name))
+				eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, fmt.Sprintf("enhancement-%s", enhancement.Name))
 				if err != nil {
 					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
+					continue
 				}
-				q.Q("Enhancement Coords: ", eCoords)
+				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
 				bluestacks.MoveClick(eCoords.X, eCoords.Y)
 				robotgo.MilliSleep(1000)
 				editorScreenImg = robotgo.CaptureImg()
 				if eType.ScrollRequirement > 0 {
 					scrollReferenceEnhancementType := enhancement.Types[0]
-					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
-					q.Q("Scroll Reference Enhancement Type Coords: ", etCoords)
+					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, editorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
 					if err != nil {
-						log.Printf("ERROR: Cannot find enhancement type %s - %v\n", scrollReferenceEnhancementType.Name, err.Error())
+						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
 					}
 					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
 					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
 					robotgo.MilliSleep(500)
 					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
 				}
-				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", eType.Name))
-				q.Q("Enhancement Type Coords: ", etCoords)
+				if debugMode {
+					go func() {
+						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
+					}()
+				}
+				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, editorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
+					err = bluestacks.OsBackClick()
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					continue
 				}
 				bluestacks.MoveClick(etCoords.X, etCoords.Y)
 				// Wait for processing to finish
@@ -417,50 +359,66 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				// 	}
 				// }
 				//* We actually do need to wait for processing... simply press the Apply button
-				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, gosseract.RIL_WORD, "editor-apply")
+				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, "editor-apply")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
+					err = bluestacks.OsBackClick()
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					continue
 				}
 				bluestacks.MoveClick(applyCoords.X, applyCoords.X)
+
+				enhancementsApplied = append(enhancementsApplied, map[string]string{
+					"name": enhancement.Name,
+					"type": eType.Name,
+				})
 			}
 
-			editorScreenImg := robotgo.CaptureImg()
-			saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, gosseract.RIL_WORD, "editor-save")
-			if err != nil {
-				log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
-			}
-			bluestacks.MoveClick(saveCoords.X, saveCoords.X)
-			robotgo.MilliSleep(2000) // Wait for the save button to disappear
-			editorScreenImg = robotgo.CaptureImg()
-			detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 100)
-			if len(detectedEnhancedFaces) == 0 {
-				log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
-				continue
-			}
-			if len(detectedEnhancedFaces) > 1 {
-				log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
-			}
-			// Save detected enhanced face to output directory
-			enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
-			enhancedFaceImgPath := path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
-			go func() {
-				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
-					log.Printf("Successfully saved detected enhanced image - %s.jpeg\n", imageId)
-				} else {
-					log.Printf("WARN: Failed to save detected enhanced image - %s.jpeg\n", imageId)
+			enhancedFaceImgPath := ""
+			if len(enhancementsApplied) > 0 {
+				editorScreenImg := robotgo.CaptureImg()
+				saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, "editor-save")
+				if err != nil {
+					log.Printf("ERROR: Cannot find Save text/button - %v\n", err.Error())
 				}
-			}()
+				bluestacks.MoveClick(saveCoords.X, saveCoords.X)
+				robotgo.MilliSleep(2000) // Wait for the save button to disappear
+				editorScreenImg = robotgo.CaptureImg()
+				detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 100)
+				if len(detectedEnhancedFaces) == 0 {
+					log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
+					continue
+				}
+				if len(detectedEnhancedFaces) > 1 {
+					log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
+				}
+				// Save detected enhanced face to output directory
+				enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
+				enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
+				go func() {
+					if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
+						log.Printf("Successfully saved detected enhanced image - %v\n", imageId)
+					} else {
+						log.Printf("WARN: Failed to save detected enhanced image - %v\n", imageId)
+					}
+				}()
+
+				// Use the back button to return to the Editor Screen
+				err = bluestacks.OsBackClick()
+				if err != nil {
+					log.Fatal("ERROR: ", err.Error())
+				}
+			} else {
+				log.Printf("No enhancements made to image - %v\n", imageId)
+			}
 
 			imageIndex = append(imageIndex, IndexedImage{
 				Id:                imageId,
+				Enhancements:      enhancementsApplied,
 				EnhancedImagePath: enhancedFaceImgPath,
 			})
-
-			// Use the back button to return to the Editor Screen
-			err = bluestacks.OsBackClick()
-			if err != nil {
-				log.Fatal("ERROR: ", err.Error())
-			}
 		}
 
 		// Use the back button to return to the Home Screen
