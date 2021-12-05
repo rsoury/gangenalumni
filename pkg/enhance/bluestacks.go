@@ -186,15 +186,18 @@ func (b *BlueStacks) GetBounds() Bounds {
 }
 
 func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image) (Coords, error) {
+	// Color manipulate once
+	// iMat, _ := gocv.ImageToMatRGB(img)
+	// // Seems greyscaling the image help with OCR.
+	// gocv.CvtColor(iMat, &iMat, gocv.ColorBGRToGray)
+	// mImg, _ := iMat.ToImage()
+	mImg := img
+
 	// Produce multiple sizes for the search image
 	var res OCRResult
 	for i := 0; i <= 9; i++ {
-		resizeWidth := int(math.Round(float64(img.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
+		resizeWidth := int(math.Round(float64(mImg.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
 		rImg := imaging.Resize(img, resizeWidth, 0, imaging.Lanczos)
-		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
-		rMat, _ := gocv.ImageToMatRGB(rImg)
-		// Seems greyscaling the image help with OCR.
-		gocv.CvtColor(rMat, &rMat, gocv.ColorBGRToGray)
 
 		// We need to produce a mat with intensified text
 		// https://answers.opencv.org/question/237967/how-to-darken-faintdim-gray-text/
