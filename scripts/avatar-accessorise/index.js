@@ -154,7 +154,7 @@ mkdirp.sync(outputDir);
 					: "right";
 
 				const addAccessory =
-					allOptions || Math.random() < accessory.probability;
+					allOptions || Math.random() <= accessory.probability;
 				if (!addAccessory) {
 					return;
 				}

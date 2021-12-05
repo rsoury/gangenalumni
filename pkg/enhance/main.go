@@ -20,10 +20,10 @@ import (
 	"image/jpeg"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +34,7 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/beeep"
 	"github.com/go-vgo/robotgo"
+	"github.com/otiai10/gosseract/v2"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"gocv.io/x/gocv"
@@ -215,15 +216,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		var rect image.Rectangle
 		if len(detectedFaces) == 0 {
 			screenImg = robotgo.CaptureImg()
-			detectedFaces = bluestacks.DetectFaces(screenImg)
+			detectedFaces = bluestacks.DetectFaces(screenImg, 100)
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), i)
 		}
-		// if len(detectedFaces) > 0 {
-		// } else {
-		// 	log.Fatalf("ERROR: No detected faces to process in screen %d\n", i)
-		// }
 		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
-		q.Q(rect)
 
 		// Run the enhancement process inside of this loop
 
@@ -237,12 +233,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		for {
 			count++
 			robotgo.MilliSleep(2000)
-			sRects := bluestacks.DetectFaces(screenImg)
-			for _, r := range sRects {
-				if r.Dx() > 100 {
-					validRects = append(validRects, r)
-				}
-			}
+			validRects = bluestacks.DetectFaces(screenImg, 100)
 			if len(validRects) > 0 || count > 10 {
 				break
 			}
@@ -256,8 +247,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// -- Use the face that was detected before the click to enhance -- This prevents the zoom out requirement
 		detectedImg := imaging.Crop(screenImg, rect)
 		if debugMode {
-			// gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
-			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-%dx%d.jpg", currentTs, i, faceCoords.X, faceCoords.Y), detectedImg)
+			go func() {
+				// gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-%dx%d.jpg", currentTs, i, faceCoords.X, faceCoords.Y), detectedImg)
+			}()
 		}
 		detectedImgBytes, _ := ImageToBytes(detectedImg)
 		// AWS call for face search
@@ -321,22 +314,147 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				if name == imageId {
 					// Read the file and unmarshal the data
 					file, _ := ioutil.ReadFile(facedataPath)
-					// _ = json.Unmarshal([]byte(file), &facedataMap)
-					// err := mapstructure.Decode(facedataMap, &facedata)
-					// if err != nil {
-					// 	log.Printf("ERROR: Cannot unmarshal face data into structure: %v", err.Error())
-					// }
 					_ = json.Unmarshal([]byte(file), &facedata)
 					break
 				}
 			}
 
-			q.Q(facedata)
+			faceDetails := facedata.FaceDetails[0]
+
+			for _, enhancement := range enhancements {
+				applyEnhancement := false
+				eType := EnhancementType{}
+				if enhancement.GenderRequirement != "" {
+					if enhancement.GenderRequirement != string(faceDetails.Gender.Value) {
+						continue
+					}
+				}
+				if enhancement.Name == "Beards" {
+					if faceDetails.Beard.Value {
+						applyEnhancement = true
+					}
+				}
+				if enhancement.Name == "Glasses" {
+					if faceDetails.Sunglasses.Value {
+						applyEnhancement = true
+						for _, t := range enhancement.Types {
+							if t.Name == "Sunglasses" {
+								eType = t
+								break
+							}
+						}
+					} else if faceDetails.Eyeglasses.Value {
+						applyEnhancement = true
+					}
+				}
+				if !applyEnhancement {
+					// Apply probabilty for enhancement
+					applyEnhancement = rand.Float64() <= enhancement.Probability
+				}
+				if !applyEnhancement {
+					continue
+				}
+				if len(eType.Name) == 0 {
+					// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
+					enhancementTypes := enhancement.ShuffleTypes()
+					for {
+						for i, t := range enhancementTypes {
+							if rand.Float64() <= t.Probability {
+								eType = t
+								break
+							} else {
+								enhancementTypes[i].Probability = enhancementTypes[i].Probability * 1.2
+								if enhancementTypes[i].Probability > 1.0 {
+									enhancementTypes[i].Probability = 1.0
+								}
+							}
+						}
+						if len(eType.Name) != 0 {
+							break
+						}
+					}
+				}
+
+				// proceed with enhancement
+				editorScreenImg := robotgo.CaptureImg()
+				eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-%s", enhancement.Name))
+				if err != nil {
+					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
+				}
+				bluestacks.MoveClick(eCoords.X, eCoords.Y)
+				robotgo.MilliSleep(1000)
+				editorScreenImg = robotgo.CaptureImg()
+				scrollReferenceEnhancement := enhancement.Types[0]
+				if eType.ScrollRequirement > 0 {
+					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancement.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancement.Name))
+					if err != nil {
+						log.Printf("ERROR: Cannot find enhancement type %s - %v\n", scrollReferenceEnhancement.Name, err.Error())
+					}
+					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
+					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
+					robotgo.MilliSleep(500)
+				}
+				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				if err != nil {
+					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
+				}
+				bluestacks.MoveClick(etCoords.X, etCoords.Y)
+				// Wait for processing to finish
+				// for {
+				// 	robotgo.MilliSleep(2000)
+				// 	loadingScreen := robotgo.CaptureImg()
+				// 	_, err := bluestacks.GetTextCoordsInImage("Processing the photo...", loadingScreen, gosseract.RIL_TEXTLINE)
+				// 	if err != nil {
+				// 		if strings.Contains(err.Error(), "Cannot find the FaceApp") {
+				// 			break
+				// 		}
+				// 	}
+				// }
+				//* We actually do need to wait for processing... simply press the Apply button
+				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, gosseract.RIL_TEXTLINE, "editor-apply")
+				if err != nil {
+					log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
+				}
+				bluestacks.MoveClick(applyCoords.X, applyCoords.X)
+			}
+
+			editorScreenImg := robotgo.CaptureImg()
+			saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, gosseract.RIL_TEXTLINE, "editor-save")
+			if err != nil {
+				log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
+			}
+			bluestacks.MoveClick(saveCoords.X, saveCoords.X)
+			robotgo.MilliSleep(2000) // Wait for the save button to disappear
+			editorScreenImg = robotgo.CaptureImg()
+			detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 100)
+			if len(detectedEnhancedFaces) == 0 {
+				log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
+				continue
+			}
+			if len(detectedEnhancedFaces) > 1 {
+				log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
+			}
+			// Save detected enhanced face to output directory
+			enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
+			enhancedFaceImgPath := filepath.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
+			go func() {
+				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
+					log.Printf("Successfully saved detected enhanced image - %s.jpeg\n", imageId)
+				} else {
+					log.Printf("WARN: Failed to save detected enhanced image - %s.jpeg\n", imageId)
+				}
+			}()
 
 			imageIndex = append(imageIndex, IndexedImage{
 				Id:                imageId,
-				EnhancedImagePath: "",
+				EnhancedImagePath: enhancedFaceImgPath,
 			})
+
+			// Use the back button to return to the Editor Screen
+			err = bluestacks.OsBackClick()
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
 		}
 
 		// Use the back button to return to the Home Screen

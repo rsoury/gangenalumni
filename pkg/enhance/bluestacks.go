@@ -225,6 +225,21 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 	return coords, nil
 }
 
+func (b *BlueStacks) GetTextCoordsInImageWithCache(text string, img image.Image, level gosseract.PageIteratorLevel, cacheKey string) (Coords, error) {
+	var coords Coords
+	var err error
+	if v, found := coordsCache[cacheKey]; found {
+		coords = v
+	} else {
+		coords, err = b.GetTextCoordsInImage(text, img, gosseract.RIL_WORD)
+		if err != nil {
+			return coords, err
+		}
+		coordsCache[cacheKey] = coords
+	}
+	return coords, nil
+}
+
 func (b *BlueStacks) GetCoordsFromCV(cvResult gcv.Result, screenImg image.Image) Coords {
 	return b.GetCoords(cvResult.Middle.X, cvResult.Middle.Y, screenImg)
 }
@@ -297,7 +312,7 @@ func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image
 	return coords, nil
 }
 
-func (b *BlueStacks) DetectFaces(img image.Image) []image.Rectangle {
+func (b *BlueStacks) DetectFaces(img image.Image, validity int) []image.Rectangle {
 	// prepare image matrix
 	screenMat, _ := gocv.ImageToMatRGB(img)
 	defer screenMat.Close()
@@ -306,7 +321,7 @@ func (b *BlueStacks) DetectFaces(img image.Image) []image.Rectangle {
 	rects := b.FaceClassifier.DetectMultiScale(screenMat)
 	var detectedFaces []image.Rectangle
 	for _, r := range rects {
-		if r.Dx() > 100 {
+		if r.Dx() > validity {
 			detectedFaces = append(detectedFaces, r)
 		}
 	}
