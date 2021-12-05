@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"q"
 	"strconv"
 	"strings"
 	"time"
@@ -357,20 +358,21 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				if len(eType.Name) == 0 {
 					// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
 					enhancementTypes := enhancement.ShuffleTypes()
+					typeIndex := 0
 					for {
-						for i, t := range enhancementTypes {
-							if rand.Float64() <= t.Probability {
-								eType = t
-								break
-							} else {
-								enhancementTypes[i].Probability = enhancementTypes[i].Probability * 1.2
-								if enhancementTypes[i].Probability > 1.0 {
-									enhancementTypes[i].Probability = 1.0
-								}
+						t := enhancementTypes[typeIndex]
+						if rand.Float64() <= t.Probability {
+							eType = t
+							break
+						} else {
+							enhancementTypes[typeIndex].Probability = enhancementTypes[typeIndex].Probability * 1.2
+							if enhancementTypes[typeIndex].Probability > 1.0 {
+								enhancementTypes[typeIndex].Probability = 1.0
 							}
 						}
-						if len(eType.Name) != 0 {
-							break
+						typeIndex++
+						if typeIndex > len(enhancementTypes) {
+							typeIndex = 0
 						}
 					}
 				}
@@ -381,20 +383,24 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				if err != nil {
 					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
 				}
+				q.Q("Enhancement Coords: ", eCoords)
 				bluestacks.MoveClick(eCoords.X, eCoords.Y)
 				robotgo.MilliSleep(1000)
 				editorScreenImg = robotgo.CaptureImg()
-				scrollReferenceEnhancement := enhancement.Types[0]
 				if eType.ScrollRequirement > 0 {
-					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancement.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancement.Name))
+					scrollReferenceEnhancementType := enhancement.Types[0]
+					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+					q.Q("Scroll Reference Enhancement Type Coords: ", etCoords)
 					if err != nil {
-						log.Printf("ERROR: Cannot find enhancement type %s - %v\n", scrollReferenceEnhancement.Name, err.Error())
+						log.Printf("ERROR: Cannot find enhancement type %s - %v\n", scrollReferenceEnhancementType.Name, err.Error())
 					}
 					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
 					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
 					robotgo.MilliSleep(500)
+					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
 				}
 				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, editorScreenImg, gosseract.RIL_TEXTLINE, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				q.Q("Enhancement Type Coords: ", etCoords)
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
 				}
@@ -411,7 +417,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				// 	}
 				// }
 				//* We actually do need to wait for processing... simply press the Apply button
-				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, gosseract.RIL_TEXTLINE, "editor-apply")
+				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, gosseract.RIL_WORD, "editor-apply")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
 				}
@@ -419,7 +425,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 
 			editorScreenImg := robotgo.CaptureImg()
-			saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, gosseract.RIL_TEXTLINE, "editor-save")
+			saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, gosseract.RIL_WORD, "editor-save")
 			if err != nil {
 				log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
 			}
@@ -436,7 +442,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 			// Save detected enhanced face to output directory
 			enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
-			enhancedFaceImgPath := filepath.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
+			enhancedFaceImgPath := path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
 			go func() {
 				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
 					log.Printf("Successfully saved detected enhanced image - %s.jpeg\n", imageId)
@@ -505,7 +511,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
-	jsonFile, err := os.Create(filepath.Join(outputDir, "index.json"))
+	jsonFile, err := os.Create(path.Join(outputDir, "index.json"))
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}

@@ -220,6 +220,10 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image, level go
 		}
 	}
 
+	if res == (OCRResult{}) {
+		return Coords{}, errors.New("Text found, but cannot specify the FaceApp '" + text + "' Text using OCR")
+	}
+
 	coords := b.GetCoords(res.Bounds.Box.Min.X+res.Bounds.Box.Dx()/2, res.Bounds.Box.Min.Y+res.Bounds.Box.Dy()/2, res.SourceImage)
 
 	return coords, nil
@@ -231,7 +235,7 @@ func (b *BlueStacks) GetTextCoordsInImageWithCache(text string, img image.Image,
 	if v, found := coordsCache[cacheKey]; found {
 		coords = v
 	} else {
-		coords, err = b.GetTextCoordsInImage(text, img, gosseract.RIL_WORD)
+		coords, err = b.GetTextCoordsInImage(text, img, level)
 		if err != nil {
 			return coords, err
 		}
