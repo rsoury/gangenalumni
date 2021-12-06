@@ -1,14 +1,13 @@
 package main
 
 import (
-	"image"
 	"os"
 	"path"
 	"q"
 	"testing"
 
 	"github.com/go-vgo/robotgo"
-	"gocv.io/x/gocv"
+	"github.com/vcaesar/gcv"
 )
 
 func TestGetTextCoordsInImage(t *testing.T) {
@@ -31,59 +30,21 @@ func TestGetTextCoordsInImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// img := robotgo.CaptureImg()
 
-	iMat, _ := gocv.ImageToMatRGB(img)
-	// Seems greyscaling the image help with OCR.
-	gocv.CvtColor(iMat, &iMat, gocv.ColorBGRToGray)
+	nImg, _ := intensifyTextInImage(img)
 
-	// gocv.Blur(iMat, &iMat, image.Point{X: 3, Y: 3})
-	// gocv.Threshold(iMat, &iMat, 240, 255, gocv.ThresholdBinary)
-	gocv.Threshold(iMat, &iMat, 245, 255, gocv.ThresholdBinary)
-	// gocv.BitwiseNot(iMat, &iMat)
-	// elementMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{X: 5, Y: 5})
-	elementMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{X: 3, Y: 3})
-	// gocv.Erode(iMat, &iMat, elementMat)
-	gocv.MorphologyEx(iMat, &iMat, gocv.MorphClose, elementMat)
-	gocv.BitwiseNot(iMat, &iMat)
-
-	// iMat.DivideFloat(255)
-	// invMat := gocv.NewMat()
-	// gocv.Invert(iMat, &invMat, gocv.SolveDecompositionLu)
-	// if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage-0.jpg"), iMat) {
+	// if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage.jpg"), iMat) {
 	// 	t.Log("Successfully wrote image to file")
 	// } else {
 	// 	t.Log("Failed to write image to file")
 	// }
-	// kernalMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{
-	// 	X: 5,
-	// 	Y: 5,
-	// })
-	// dMat := iMat.Clone()
-	// gocv.Dilate(dMat, &dMat, kernalMat)
-	// tMat := dMat.Clone()
-	// gocv.Threshold(dMat, &tMat, 0.15, 0.15, gocv.ThresholdMask)
-	// eMat := gocv.NewMat()
-	// gocv.Divide(iMat, dMat, &eMat)
-	// iMat.CopyToWithMask(&eMat, tMat)
-	// oMat := gocv.NewMat()
-	// gocv.Invert(eMat, &oMat, gocv.SolveDecompositionLu)
-
-	// if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage-e.jpg"), oMat) {
-	// 	t.Log("Successfully wrote image to file")
-	// } else {
-	// 	t.Log("Failed to write image to file")
-	// }
-
-	mImg, _ := iMat.ToImage()
-
-	if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage.jpg"), iMat) {
+	if gcv.ImgWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage.jpg"), nImg) {
 		t.Log("Successfully wrote image to file")
 	} else {
 		t.Log("Failed to write image to file")
 	}
 
-	coords, err := bluestacks.GetTextCoordsInImage("Contouring", mImg)
+	coords, err := bluestacks.GetTextCoordsInImage("Foundation", nImg)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

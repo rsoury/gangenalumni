@@ -90,6 +90,14 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Fatalln("ERROR:", err)
 		}
 		log.Println("Start enhancement in debug mode...")
+
+		// Modify enhancements in Debug Mode to have all items with max probability
+		for i := 0; i < len(enhancements); i++ {
+			enhancements[i].Probability = 1
+			for j := 0; j < len(enhancements[i].Types); j++ {
+				enhancements[i].Types[j].Probability = 1
+			}
+		}
 	} else {
 		log.Println("Start enhancement...")
 	}
@@ -381,6 +389,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			enhancedFaceImgPath := ""
 			if len(enhancementsApplied) > 0 {
 				editorScreenImg := robotgo.CaptureImg()
+				// intenseEditorScreenImg, _ := intensifyTextInImage(editorScreenImg)
 				saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, "editor-save")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Save text/button - %v\n", err.Error())

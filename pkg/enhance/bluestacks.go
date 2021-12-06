@@ -201,7 +201,7 @@ func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image) (Coords,
 		}
 		_ = b.OCRClient.SetImageFromBytes(imgBytes)
 
-		boxes, err := b.OCRClient.GetBoundingBoxes(gosseract.RIL_WORD)
+		boxes, err := b.OCRClient.GetBoundingBoxes(gosseract.RIL_TEXTLINE)
 		// TEST
 		for _, box := range boxes {
 			if strings.Contains(box.Word, text) {
