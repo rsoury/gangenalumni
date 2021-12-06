@@ -319,9 +319,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				bluestacks.MoveClick(eCoords.X, eCoords.Y)
 				robotgo.MilliSleep(1000)
 				editorScreenImg = robotgo.CaptureImg()
+				intenseEditorScreenImg, _ := intensifyTextInImage(editorScreenImg)
 				if eType.ScrollRequirement > 0 {
 					scrollReferenceEnhancementType := enhancement.Types[0]
-					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, editorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
 					if err != nil {
 						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
@@ -330,13 +331,14 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
 					robotgo.MilliSleep(500)
 					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
+					intenseEditorScreenImg, _ = intensifyTextInImage(editorScreenImg)
 				}
 				if debugMode {
 					go func() {
 						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
 					}()
 				}
-				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, editorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
 				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
@@ -358,7 +360,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				// 		}
 				// 	}
 				// }
-				//* We actually do need to wait for processing... simply press the Apply button
+				//* We actually do not need to wait for processing... simply press the Apply button
 				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, "editor-apply")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
