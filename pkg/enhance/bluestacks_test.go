@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image"
 	"os"
 	"path"
 	"q"
@@ -36,9 +37,19 @@ func TestGetTextCoordsInImage(t *testing.T) {
 	// Seems greyscaling the image help with OCR.
 	gocv.CvtColor(iMat, &iMat, gocv.ColorBGRToGray)
 
-	iMat.DivideFloat(255)
-	invMat := gocv.NewMat()
-	gocv.Invert(iMat, &invMat, gocv.SolveDecompositionLu)
+	// gocv.Blur(iMat, &iMat, image.Point{X: 3, Y: 3})
+	// gocv.Threshold(iMat, &iMat, 240, 255, gocv.ThresholdBinary)
+	gocv.Threshold(iMat, &iMat, 245, 255, gocv.ThresholdBinary)
+	// gocv.BitwiseNot(iMat, &iMat)
+	// elementMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{X: 5, Y: 5})
+	elementMat := gocv.GetStructuringElement(gocv.MorphRect, image.Point{X: 3, Y: 3})
+	// gocv.Erode(iMat, &iMat, elementMat)
+	gocv.MorphologyEx(iMat, &iMat, gocv.MorphClose, elementMat)
+	gocv.BitwiseNot(iMat, &iMat)
+
+	// iMat.DivideFloat(255)
+	// invMat := gocv.NewMat()
+	// gocv.Invert(iMat, &invMat, gocv.SolveDecompositionLu)
 	// if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage-0.jpg"), iMat) {
 	// 	t.Log("Successfully wrote image to file")
 	// } else {
