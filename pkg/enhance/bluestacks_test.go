@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"q"
+	"strings"
 	"testing"
 
 	"github.com/go-vgo/robotgo"
@@ -26,61 +29,63 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 			Y: screenHeight / 2,
 		},
 	}
-
-	// bluestacks.StartOCR()
-	// defer bluestacks.OCRClient.Close()
-	img, _, err := robotgo.DecodeImg(path.Join(cwd, "./test/editor-screen-Eyebrows--1638706561.jpg"))
-	if err != nil {
-		t.Fatal(err)
+	imagePaths := make(map[string][]string)
+	assets, _ := filepath.Glob(path.Join(cwd, "./assets/faceapp/*.png"))
+	enhancementAssets := []string{}
+	enhancementMakeupAssets := []string{}
+	for _, asset := range assets {
+		if strings.Contains(path.Base(asset), "enhancement-") {
+			enhancementAssets = append(enhancementAssets, asset)
+		}
+		if strings.Contains(path.Base(asset), "etype-makeup-") {
+			enhancementMakeupAssets = append(enhancementMakeupAssets, asset)
+		}
 	}
+	imagePaths[path.Join(cwd, "./test/editor-screen-Eyebrows--1638706561.jpg")] = enhancementMakeupAssets
+	imagePaths[path.Join(cwd, "./test/editor-screen-Petite Goatee--1638866689.jpg")] = enhancementAssets
 
-	// nImg, _ := intensifyTextInImage(img)
+	// q.Q(imagePaths)
 
-	// if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage.jpg"), iMat) {
-	// 	t.Log("Successfully wrote image to file")
-	// } else {
-	// 	t.Log("Failed to write image to file")
-	// }
-	// if gcv.ImgWrite(path.Join(cwd, "./tmp/test/TestGetTextCoordsInImage.jpg"), nImg) {
-	// 	t.Log("Successfully wrote image to file")
-	// } else {
-	// 	t.Log("Failed to write image to file")
-	// }
+	for ePath, eTypePaths := range imagePaths {
+		t.Logf("Processing image path %v\n", ePath)
+		img, _, err := robotgo.DecodeImg(ePath)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// coords, err := bluestacks.GetTextCoordsInImage("Foundation", nImg)
-	coords1, err := bluestacks.GetImagePathCoordsInImage(path.Join(cwd, "./assets/faceapp/etype-makeup-foundation.png"), img)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	q.Q(coords1, err)
-	t.Log(coords1)
-	coords2, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-		return bluestacks.GetImagePathCoordsInImage(path.Join(cwd, "./assets/faceapp/etype-makeup-contouring.png"), img)
-	}, "hello-world")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	q.Q(coords2, err)
-	t.Log(coords2)
+		// color for the rect when faces detected
+		blue := color.RGBA{0, 0, 255, 0}
+		// draw a rectangle around each face on the original image,
+		// along with text identifing as "Human"
+		iMat, _ := gocv.ImageToMatRGB(img)
+		defer iMat.Close()
+		for _, eTypePath := range eTypePaths {
+			t.Logf("Finding image path: %v\n", eTypePath)
+			coords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage(eTypePath, img)
+			}, eTypePath)
+			if err != nil {
+				t.Errorf("Cannot find image inside of processing image: %v\n", err.Error())
+				continue
+			}
+			q.Q(coords, err)
+			t.Log(coords)
 
-	coordsArr := []Coords{coords1, coords2}
+			imageCoords := getCoordsInImage(coords.X, coords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
+			rect := image.Rect(imageCoords.X-10, imageCoords.Y-10, imageCoords.X+10, imageCoords.Y+10)
+			gocv.Rectangle(&iMat, rect, blue, 3)
+			text := strings.ReplaceAll((strings.ReplaceAll(path.Base(eTypePath), "enhancement-", "")), "etype-makeup-", "")
+			text = text[0 : len(text)-len(filepath.Ext(text))]
+			size := gocv.GetTextSize(text, gocv.FontHersheyPlain, 1.2, 2)
+			pt := image.Pt(imageCoords.X-(size.X/2), imageCoords.Y-(size.Y)-10)
+			gocv.PutText(&iMat, text, pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+		}
 
-	// color for the rect when faces detected
-	blue := color.RGBA{0, 0, 255, 0}
-	// draw a rectangle around each face on the original image,
-	// along with text identifing as "Human"
-	iMat, _ := gocv.ImageToMatRGB(img)
-	defer iMat.Close()
-	for _, coords := range coordsArr {
-		imageCoords := getCoordsInImage(coords.X, coords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
-		rect := image.Rect(imageCoords.X-10, imageCoords.Y-10, imageCoords.X+10, imageCoords.Y+10)
-		gocv.Rectangle(&iMat, rect, blue, 3)
-	}
-
-	if gocv.IMWrite(path.Join(cwd, "./tmp/test/TestGetImagePathCoordsInImage.jpg"), iMat) {
-		t.Log("Successfully created opencv image\n")
-	} else {
-		t.Log("Failed to create opencv image\n")
+		if gocv.IMWrite(path.Join(cwd, fmt.Sprintf("./tmp/test/TestGetImagePathCoordsInImage-%s.jpg", path.Base(ePath))), iMat) {
+			t.Logf("Successfully created opencv image for image path %v\n", ePath)
+		} else {
+			t.Logf("Failed to create opencv image for image path %v\n", ePath)
+		}
 	}
 }
 

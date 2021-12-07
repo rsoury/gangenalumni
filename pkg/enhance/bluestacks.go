@@ -192,7 +192,10 @@ func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 
 // We have a process of resizing the search image to determine the result with the best confidence.
 func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, error) {
-	searchMat, _ := gocv.ImageToMatRGB(searchImg)
+	searchMat, err := gocv.ImageToMatRGB(searchImg)
+	if err != nil {
+		return Coords{}, err
+	}
 	defer searchMat.Close()
 
 	// Produce multiple sizes for the search image
@@ -202,7 +205,7 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 		rImg := imaging.Resize(sourceImg, resizeWidth, 0, imaging.Lanczos)
 		// fmt.Printf("Resizing image for width %d\n", resizeWidth)
 		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
-		if rImg.Bounds().Dx() < searchImg.Bounds().Dx() {
+		if rImg.Bounds().Dx() <= searchImg.Bounds().Dx() || rImg.Bounds().Dy() <= searchImg.Bounds().Dy() {
 			break // Break the loop if the source image resize becomes smaller than the search image.
 		}
 		// Then process the results to determine the most common coordinate location on the sourceImg
@@ -222,7 +225,7 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 			SourceImage: rImg,
 		}
 
-		if r.Confidence > res.Confidence {
+		if r.Confidence > res.Confidence && r.Confidence > 0.5 {
 			res = r
 		}
 	}
@@ -237,7 +240,10 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 }
 
 func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image.Image) (Coords, error) {
-	searchImg, _, _ := robotgo.DecodeImg(imagePath)
+	searchImg, _, err := robotgo.DecodeImg(imagePath)
+	if err != nil {
+		return Coords{}, fmt.Errorf("%v: %s", err, imagePath)
+	}
 	coords, err := b.GetImageCoordsInImage(searchImg, sourceImg)
 	if err != nil {
 		return coords, fmt.Errorf("%v: %s", err, imagePath)
