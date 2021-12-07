@@ -36,6 +36,7 @@ import (
 	"github.com/go-vgo/robotgo"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
+	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 )
 
@@ -154,6 +155,31 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// Detect or iterate over the next face
 		var rect image.Rectangle
 		if len(detectedFaces) == 0 {
+			// break // Test -- If not the first iteration AND detectedFaces is empty.
+			// Execute scroll behaviour here -- Do not compare pre/post images on first iteration as there will be no scroll
+			// If we cannot scroll anymore, break the loop
+			theEnd := false
+			for s := 0; s < i; s++ {
+				// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
+				preImg := robotgo.CaptureImg()
+				for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
+					robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
+					robotgo.MilliSleep(250)
+					robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-240)
+				}
+				robotgo.MilliSleep(250)
+				postImg := robotgo.CaptureImg()
+				hashA, imgSizeA := images.Hash(preImg)
+				hashB, imgSizeB := images.Hash(postImg)
+				if images.Similar(hashA, hashB, imgSizeA, imgSizeB) {
+					// If after scrolling, the screen is the same, the break... -- this means that there are no more images to scroll
+					theEnd = true
+					break
+				}
+			}
+			if theEnd {
+				break
+			}
 			screenImg = robotgo.CaptureImg()
 			detectedFaces = bluestacks.DetectFaces(screenImg, 100)
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), i)
@@ -181,6 +207,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
 		if len(validRects) == 0 {
 			log.Printf("WARN: Face %d has not been detected after selection...\n", i)
+			err = bluestacks.OsBackClick()
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
 			continue
 		}
 		log.Printf("Face %d has been detected...\n", i)
@@ -230,6 +260,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		alreadyEnhanced := false
 		for _, indexedImage := range imageIndex {
 			if indexedImage.Id == imageId {
+				log.Printf("Face %d Image ID %v has already been enhanced", i, imageId)
 				alreadyEnhanced = true
 				break
 			}
@@ -267,6 +298,14 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 
 			faceDetails := facedata.FaceDetails[0]
+			if (*faceDetails.AgeRange.Low) < 18 {
+				log.Printf("Character is underage - Image ID %v\n", imageId)
+				err = bluestacks.OsBackClick()
+				if err != nil {
+					log.Fatal("ERROR: ", err.Error())
+				}
+				continue
+			}
 
 			enhancementsApplied := []map[string]string{}
 			for _, enhancement := range enhancements {
@@ -476,14 +515,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// Iterate the count
 		i++
 
-		if len(detectedFaces) == 0 {
-			// Here we'd scroll depending on whether a scroll is required.
-			// If we cannot scroll anymore, break the loop
-			if i > 0 { // Test -- If not the first iteration AND detectedFaces is empty.
-				break
-			}
-
-			if debugMode {
+		if debugMode {
+			if len(detectedFaces) == 0 {
 				go func() {
 					// color for the rect when faces detected
 					blue := color.RGBA{0, 0, 255, 0}
