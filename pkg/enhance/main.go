@@ -336,6 +336,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
 				bluestacks.MoveClick(eCoords.X, eCoords.Y)
 				robotgo.MilliSleep(1000)
+				log.Printf("Image ID %v - Entered into enhancement %s\n", imageId, enhancement.Name)
+
 				editorScreenImg = robotgo.CaptureImg()
 				if eType.ScrollRequirement > 0 {
 					scrollReferenceEnhancementType := enhancement.Types[0]
@@ -349,8 +351,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					}
 					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
 					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
-					robotgo.MilliSleep(500)
+					robotgo.MilliSleep(1000)
 					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
+					log.Printf("Image ID %v - Horizontal scroll to find enhancement %s type %s\n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
 				}
 				if debugMode {
 					go func() {
@@ -371,6 +374,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					continue
 				}
 				bluestacks.MoveClick(etCoords.X, etCoords.Y)
+				log.Printf("Image ID %v - Enhanced using enhancement %s type %s\n", imageId, enhancement.Name, eType.Name)
 				applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
 				}, "editor-apply")
@@ -383,6 +387,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					continue
 				}
 				bluestacks.MoveClick(applyCoords.X, applyCoords.X)
+				robotgo.MilliSleep(500) // Wait for Apply and return to editor screen animation
+				log.Printf("Image ID %v - Enhancements applied\n", imageId)
 
 				enhancementsApplied = append(enhancementsApplied, map[string]string{
 					"name": enhancement.Name,
@@ -401,6 +407,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 				bluestacks.MoveClick(saveCoords.X, saveCoords.X)
 				robotgo.MilliSleep(2000) // Wait for the save button to disappear
+				log.Printf("Image ID %v - Saved\n", imageId)
 				editorScreenImg = robotgo.CaptureImg()
 				detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 100)
 				if len(detectedEnhancedFaces) == 0 {

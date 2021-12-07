@@ -41,8 +41,16 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 			enhancementMakeupAssets = append(enhancementMakeupAssets, asset)
 		}
 	}
-	imagePaths[path.Join(cwd, "./test/editor-screen-Eyebrows--1638706561.jpg")] = enhancementMakeupAssets
-	imagePaths[path.Join(cwd, "./test/editor-screen-Petite Goatee--1638866689.jpg")] = enhancementAssets
+	editorEnhancementTypeSelectImagePath := path.Join(cwd, "./test/editor-screen-Eyebrows--1638706561.jpg")
+	editorEnhancementSelectImagePath := path.Join(cwd, "./test/editor-screen-Petite Goatee--1638866689.jpg")
+	applyImgPath := path.Join(cwd, "./assets/faceapp/apply.png")
+	saveImgPath := path.Join(cwd, "./assets/faceapp/save.png")
+	applyImg, _, _ := robotgo.DecodeImg(applyImgPath)
+	saveImg, _, _ := robotgo.DecodeImg(saveImgPath)
+	imagePaths[editorEnhancementTypeSelectImagePath] = enhancementMakeupAssets
+	imagePaths[editorEnhancementSelectImagePath] = enhancementAssets
+	// imagePaths[editorEnhancementTypeSelectImagePath] = []string{}
+	// imagePaths[editorEnhancementSelectImagePath] = []string{}
 
 	// q.Q(imagePaths)
 
@@ -79,6 +87,32 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 			size := gocv.GetTextSize(text, gocv.FontHersheyPlain, 1.2, 2)
 			pt := image.Pt(imageCoords.X-(size.X/2), imageCoords.Y-(size.Y)-10)
 			gocv.PutText(&iMat, text, pt, gocv.FontHersheyPlain, 1.2, blue, 2)
+		}
+
+		if ePath == editorEnhancementTypeSelectImagePath {
+			applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage(applyImgPath, img)
+			}, "editor-apply")
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+			saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage(saveImgPath, img)
+			}, "editor-save")
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+			q.Q(saveCoords, applyCoords)
+
+			applyImgCoords := getCoordsInImage(applyCoords.X, applyCoords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
+			applyRect := image.Rect(applyImgCoords.X-applyImg.Bounds().Dx()/2, applyImgCoords.Y-applyImg.Bounds().Dy()/2, applyImgCoords.X+applyImg.Bounds().Dx()/2, applyImgCoords.Y+applyImg.Bounds().Dy()/2)
+			gocv.Rectangle(&iMat, applyRect, blue, 3)
+			gocv.Rectangle(&iMat, image.Rect(applyImgCoords.X-10, applyImgCoords.Y-10, applyImgCoords.X+10, applyImgCoords.Y+10), color.RGBA{0, 255, 0, 0}, 3)
+			saveImgCoords := getCoordsInImage(saveCoords.X, saveCoords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
+			saveRect := image.Rect(saveImgCoords.X-saveImg.Bounds().Dx()/2, saveImgCoords.Y-saveImg.Bounds().Dy()/2, saveImgCoords.X+saveImg.Bounds().Dx()/2, saveImgCoords.Y+saveImg.Bounds().Dy()/2)
+			gocv.Rectangle(&iMat, saveRect, blue, 3)
+			gocv.Rectangle(&iMat, image.Rect(saveImgCoords.X-10, saveImgCoords.Y-10, saveImgCoords.X+10, saveImgCoords.Y+10), color.RGBA{0, 255, 0, 0}, 3)
+			t.Log("Save and Apply rectangles drawn")
 		}
 
 		if gocv.IMWrite(path.Join(cwd, fmt.Sprintf("./tmp/test/TestGetImagePathCoordsInImage-%s.jpg", path.Base(ePath))), iMat) {
