@@ -304,7 +304,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 				if len(eType.Name) == 0 {
 					// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
-					enhancementTypes := enhancement.Types
+					enhancementTypes := enhancement.ShuffleTypes()
 					typeIndex := 0
 					for {
 						t := enhancementTypes[typeIndex]
