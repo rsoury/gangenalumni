@@ -18,6 +18,7 @@ import (
 	"image/color"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"path"
@@ -324,6 +325,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 
 				// proceed with enhancement
+				log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
 				editorScreenImg := robotgo.CaptureImg()
 				// eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, fmt.Sprintf("enhancement-%s", enhancement.Name))
 				eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
@@ -341,6 +343,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				editorScreenImg = robotgo.CaptureImg()
 				if eType.ScrollRequirement > 0 {
 					scrollReferenceEnhancementType := enhancement.Types[0]
+					log.Printf("Image ID %v - Finding scroll reference to find enhancement %s type %s ... \n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
 					// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 					etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 						return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
@@ -349,8 +352,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					if err != nil {
 						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
 					}
-					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
-					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
+					scrollIterations := int(math.Round(float64(eType.ScrollRequirement) / 200.0))
+					for s := 0; s < scrollIterations; s++ {
+						robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
+						robotgo.MilliSleep(500)
+						robotgo.DragSmooth(bluestacks.CenterCoords.X-200, etCoords.Y)
+					}
 					robotgo.MilliSleep(1000)
 					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
 					log.Printf("Image ID %v - Horizontal scroll to find enhancement %s type %s\n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
@@ -360,6 +367,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
 					}()
 				}
+				log.Printf("Image ID %v - Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
 				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
@@ -386,8 +394,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					}
 					continue
 				}
-				bluestacks.MoveClick(applyCoords.X, applyCoords.X)
-				robotgo.MilliSleep(500) // Wait for Apply and return to editor screen animation
+				q.Q("Apply Coords: ", applyCoords)
+				bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
+				robotgo.Click()          // Double click to make sure....
+				robotgo.MilliSleep(1000) // Wait for Apply and return to editor screen animation
 				log.Printf("Image ID %v - Enhancements applied\n", imageId)
 
 				enhancementsApplied = append(enhancementsApplied, map[string]string{
@@ -404,8 +414,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}, "editor-save")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Save text/button - %v\n", err.Error())
+					err = bluestacks.OsBackClick()
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					continue
 				}
-				bluestacks.MoveClick(saveCoords.X, saveCoords.X)
+				q.Q("Save Coords: ", saveCoords)
+				bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
+				robotgo.Click()          // Double click to make sure...
 				robotgo.MilliSleep(2000) // Wait for the save button to disappear
 				log.Printf("Image ID %v - Saved\n", imageId)
 				editorScreenImg = robotgo.CaptureImg()

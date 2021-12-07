@@ -48,6 +48,7 @@ var (
 
 func init() {
 	robotgo.KeySleep = 100
+	robotgo.MouseSleep = 100
 }
 
 func NewBlueStacks() *BlueStacks {

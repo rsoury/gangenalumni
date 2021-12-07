@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-vgo/robotgo"
+	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 )
 
@@ -57,4 +59,17 @@ func intensifyTextInImage(img image.Image) (image.Image, error) {
 		return img, err
 	}
 	return nImg, nil
+}
+
+func EnsureChange(changeEvent func()) {
+	for {
+		preImg := robotgo.CaptureImg()
+		hashA, imgSizeA := images.Hash(preImg)
+		changeEvent()
+		postImg := robotgo.CaptureImg()
+		hashB, imgSizeB := images.Hash(postImg)
+		if !images.Similar(hashA, hashB, imgSizeA, imgSizeB) {
+			break
+		}
+	}
 }

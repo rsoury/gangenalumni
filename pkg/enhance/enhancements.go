@@ -107,22 +107,22 @@ var (
 				{
 					Name:              "Dark Matte",
 					Probability:       0.1,
-					ScrollRequirement: 500,
+					ScrollRequirement: 800,
 				},
 				{
 					Name:              "Dark",
 					Probability:       0.1,
-					ScrollRequirement: 500,
+					ScrollRequirement: 800,
 				},
 				{
 					Name:              "Bright Glossy",
 					Probability:       0.1,
-					ScrollRequirement: 500,
+					ScrollRequirement: 800,
 				},
 				{
 					Name:              "Dark Glossy",
 					Probability:       0.1,
-					ScrollRequirement: 500,
+					ScrollRequirement: 800,
 				},
 			},
 		},
