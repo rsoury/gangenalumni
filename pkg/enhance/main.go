@@ -304,7 +304,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 				if len(eType.Name) == 0 {
 					// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
-					enhancementTypes := enhancement.ShuffleTypes()
+					enhancementTypes := enhancement.Types
 					typeIndex := 0
 					for {
 						t := enhancementTypes[typeIndex]
@@ -342,7 +342,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 				editorScreenImg = robotgo.CaptureImg()
 				if eType.ScrollRequirement > 0 {
-					scrollReferenceEnhancementType := enhancement.Types[0]
+					var scrollReferenceEnhancementType EnhancementType
+					for _, t := range enhancement.Types {
+						if t.ScrollRequirement == 0 {
+							scrollReferenceEnhancementType = t
+							break
+						}
+					}
 					log.Printf("Image ID %v - Finding scroll reference to find enhancement %s type %s ... \n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
 					// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 					etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
@@ -426,12 +432,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				robotgo.MilliSleep(2000) // Wait for the save button to disappear
 				log.Printf("Image ID %v - Saved\n", imageId)
 				editorScreenImg = robotgo.CaptureImg()
-				detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 100)
+				detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 300) // Increase validity integer to prevent detching before & after faces
 				if len(detectedEnhancedFaces) == 0 {
 					log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
 					continue
 				}
 				if len(detectedEnhancedFaces) > 1 {
+					// This was being hit due to the images inside of then Before & After image.
 					log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
 				}
 				// Save detected enhanced face to output directory
