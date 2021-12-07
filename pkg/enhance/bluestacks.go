@@ -6,13 +6,10 @@ import (
 	"image"
 	"log"
 	"math"
-	"q"
-	"strings"
 	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-vgo/robotgo"
-	"github.com/otiai10/gosseract/v2"
 	"github.com/vcaesar/gcv"
 	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
@@ -31,7 +28,6 @@ type Bounds struct {
 }
 
 type BlueStacks struct {
-	OCRClient      *gosseract.Client
 	ActivePID      int32
 	ScreenWidth    int
 	ScreenHeight   int
@@ -43,10 +39,6 @@ type CVResult struct {
 	Confidence  float32
 	Point       image.Point
 	SearchImage image.Image
-	SourceImage image.Image
-}
-type OCRResult struct {
-	Bounds      gosseract.BoundingBox
 	SourceImage image.Image
 }
 
@@ -109,10 +101,6 @@ func (b *BlueStacks) LoadFaceClassifier(cascadeFile string) error {
 	}
 
 	return nil
-}
-
-func (b *BlueStacks) StartOCR() {
-	b.OCRClient = gosseract.NewClient()
 }
 
 func (b *BlueStacks) MoveClick(x, y int) {
@@ -185,76 +173,6 @@ func (b *BlueStacks) GetBounds() Bounds {
 	}
 }
 
-func (b *BlueStacks) GetTextCoordsInImage(text string, img image.Image) (Coords, error) {
-	// Produce multiple sizes for the search image
-	var res OCRResult
-	for i := 0; i <= 9; i++ {
-		resizeWidth := int(math.Round(float64(img.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
-		rImg := imaging.Resize(img, resizeWidth, 0, imaging.Lanczos)
-
-		// We need to produce a mat with intensified text
-		// https://answers.opencv.org/question/237967/how-to-darken-faintdim-gray-text/
-
-		imgBytes, err := ImageToBytes(img)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		_ = b.OCRClient.SetImageFromBytes(imgBytes)
-
-		boxes, err := b.OCRClient.GetBoundingBoxes(gosseract.RIL_TEXTLINE)
-		// TEST
-		for _, box := range boxes {
-			if strings.Contains(box.Word, text) {
-				q.Q(text, box)
-			} else {
-				q.Q(text, box.Word)
-			}
-		}
-
-		if err != nil {
-			return Coords{}, err
-		}
-		if len(boxes) == 0 {
-			return Coords{}, errors.New("Cannot find text on screen")
-		}
-
-		for _, box := range boxes {
-			if strings.Contains(box.Word, text) {
-				if box.Confidence > res.Bounds.Confidence {
-					res = OCRResult{
-						Bounds:      box,
-						SourceImage: rImg,
-					}
-				}
-				break
-			}
-		}
-	}
-
-	if res == (OCRResult{}) {
-		return Coords{}, errors.New("Cannot find the FaceApp '" + text + "' Text using OCR")
-	}
-
-	coords := b.GetCoords(res.Bounds.Box.Min.X+res.Bounds.Box.Dx()/2, res.Bounds.Box.Min.Y+res.Bounds.Box.Dy()/2, res.SourceImage)
-
-	return coords, nil
-}
-
-func (b *BlueStacks) GetTextCoordsInImageWithCache(text string, img image.Image, cacheKey string) (Coords, error) {
-	var coords Coords
-	var err error
-	if v, found := coordsCache[cacheKey]; found {
-		coords = v
-	} else {
-		coords, err = b.GetTextCoordsInImage(text, img)
-		if err != nil {
-			return coords, err
-		}
-		coordsCache[cacheKey] = coords
-	}
-	return coords, nil
-}
-
 func (b *BlueStacks) GetCoordsFromCV(cvResult gcv.Result, screenImg image.Image) Coords {
 	return b.GetCoords(cvResult.Middle.X, cvResult.Middle.Y, screenImg)
 }
@@ -323,6 +241,21 @@ func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image
 	coords, err := b.GetImageCoordsInImage(searchImg, sourceImg)
 	if err != nil {
 		return coords, fmt.Errorf("%v: %s", err, imagePath)
+	}
+	return coords, nil
+}
+
+func (b *BlueStacks) GetCoordsWithCache(getCoords func() (Coords, error), cacheKey string) (Coords, error) {
+	var coords Coords
+	var err error
+	if v, found := coordsCache[cacheKey]; found {
+		coords = v
+	} else {
+		coords, err = getCoords()
+		if err != nil {
+			return coords, err
+		}
+		coordsCache[cacheKey] = coords
 	}
 	return coords, nil
 }

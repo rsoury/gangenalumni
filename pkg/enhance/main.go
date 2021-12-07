@@ -5,6 +5,7 @@
  *
  * Requires that Bluestacks 4 is open, and that Media Manager has imported all images.
  * Running enhance go script requires opencv4 as a dependency.
+ * -- IMPORTANT: Be sure to switch the FaceApp Gender Interface to "Female interface" for Asset Compatibility
  */
 
 package main
@@ -23,6 +24,7 @@ import (
 	"path/filepath"
 	"q"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -134,9 +136,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		log.Fatalf("ERROR: %v", err.Error())
 	}
 	defer bluestacks.FaceClassifier.Close()
-
-	bluestacks.StartOCR()
-	defer bluestacks.OCRClient.Close()
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
@@ -318,7 +317,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 				// proceed with enhancement
 				editorScreenImg := robotgo.CaptureImg()
-				eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, fmt.Sprintf("enhancement-%s", enhancement.Name))
+				// eCoords, err := bluestacks.GetTextCoordsInImageWithCache(enhancement.Name, editorScreenImg, fmt.Sprintf("enhancement-%s", enhancement.Name))
+				eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
+				}, fmt.Sprintf("enhancement-%s", enhancement.Name))
 				if err != nil {
 					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
 					continue
@@ -327,10 +329,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				bluestacks.MoveClick(eCoords.X, eCoords.Y)
 				robotgo.MilliSleep(1000)
 				editorScreenImg = robotgo.CaptureImg()
-				intenseEditorScreenImg, _ := intensifyTextInImage(editorScreenImg)
 				if eType.ScrollRequirement > 0 {
 					scrollReferenceEnhancementType := enhancement.Types[0]
-					etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+					// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+					etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+						return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
+					}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
 					if err != nil {
 						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
@@ -339,14 +343,16 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					robotgo.DragSmooth(bluestacks.CenterCoords.X-eType.ScrollRequirement, etCoords.Y)
 					robotgo.MilliSleep(500)
 					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
-					intenseEditorScreenImg, _ = intensifyTextInImage(editorScreenImg)
 				}
 				if debugMode {
 					go func() {
 						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
 					}()
 				}
-				etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
+				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
+				}, fmt.Sprintf("enhancement-type-%s", eType.Name))
 				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
@@ -357,19 +363,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					continue
 				}
 				bluestacks.MoveClick(etCoords.X, etCoords.Y)
-				// Wait for processing to finish
-				// for {
-				// 	robotgo.MilliSleep(2000)
-				// 	loadingScreen := robotgo.CaptureImg()
-				// 	_, err := bluestacks.GetTextCoordsInImage("Processing the photo...", loadingScreen, gosseract.RIL_TEXTLINE)
-				// 	if err != nil {
-				// 		if strings.Contains(err.Error(), "Cannot find the FaceApp") {
-				// 			break
-				// 		}
-				// 	}
-				// }
-				//* We actually do not need to wait for processing... simply press the Apply button
-				applyCoords, err := bluestacks.GetTextCoordsInImageWithCache("Apply", editorScreenImg, "editor-apply")
+				applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+					return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
+				}, "editor-apply")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
 					err = bluestacks.OsBackClick()
@@ -389,8 +385,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			enhancedFaceImgPath := ""
 			if len(enhancementsApplied) > 0 {
 				editorScreenImg := robotgo.CaptureImg()
-				// intenseEditorScreenImg, _ := intensifyTextInImage(editorScreenImg)
-				saveCoords, err := bluestacks.GetTextCoordsInImageWithCache("Save", editorScreenImg, "editor-save")
+				saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+					return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
+				}, "editor-save")
 				if err != nil {
 					log.Printf("ERROR: Cannot find Save text/button - %v\n", err.Error())
 				}
