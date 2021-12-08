@@ -22,7 +22,7 @@ var (
 	enhancements = []Enhancement{
 		{
 			Name:              "Beards",
-			Probability:       0.55,
+			Probability:       0.5,
 			GenderRequirement: "Male",
 			Types: []EnhancementType{
 				{
@@ -128,7 +128,7 @@ var (
 		},
 		{
 			Name:        "Glasses",
-			Probability: 0.5,
+			Probability: 0.3,
 			Types: []EnhancementType{
 				{
 					Name:        "Glasses",

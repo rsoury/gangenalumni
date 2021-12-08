@@ -357,3 +357,24 @@ func (b *BlueStacks) OsBackClick() error {
 
 	return nil
 }
+
+// Used within the Enhancements Loop
+func (b *BlueStacks) ExitScreen(shouldExitModal bool) error {
+	err := b.OsBackClick()
+	if err != nil {
+		return err
+	}
+	if shouldExitModal {
+		exitModalScreen := robotgo.CaptureImg()
+		exitCoords, err := b.GetCoordsWithCache(func() (Coords, error) {
+			return b.GetImagePathCoordsInImage("./assets/faceapp/exit.png", exitModalScreen)
+		}, "exit")
+		if err != nil {
+			return err
+		}
+		b.MoveClick(exitCoords.X, exitCoords.Y)
+		robotgo.MilliSleep(1000)
+	}
+
+	return nil
+}

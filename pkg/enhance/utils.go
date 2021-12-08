@@ -64,12 +64,16 @@ func intensifyTextInImage(img image.Image) (image.Image, error) {
 func EnsureChange(changeEvent func()) {
 	for {
 		preImg := robotgo.CaptureImg()
-		hashA, imgSizeA := images.Hash(preImg)
 		changeEvent()
 		postImg := robotgo.CaptureImg()
-		hashB, imgSizeB := images.Hash(postImg)
-		if !images.Similar(hashA, hashB, imgSizeA, imgSizeB) {
+		if !imagesSimilar(preImg, postImg) {
 			break
 		}
 	}
+}
+
+func imagesSimilar(imgA, imgB image.Image) bool {
+	hashA, imgSizeA := images.Hash(imgA)
+	hashB, imgSizeB := images.Hash(imgB)
+	return images.Similar(hashA, hashB, imgSizeA, imgSizeB)
 }
