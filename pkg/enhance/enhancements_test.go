@@ -24,5 +24,9 @@ func TestShuffleTypes(t *testing.T) {
 			t.Logf("Original Enhancement Types [Length: %d] do not exist with shuffled Types -- with an existence count of %d", len(enh.Types), existsCount)
 			t.Fail()
 		}
+		// if types[0].Name == enh.Types[0].Name && types[len(types)-1].Name == enh.Types[len(enh.Types)-1].Name {
+		// 	t.Logf("")
+		// 	t.Fail()
+		// }
 	}
 }
