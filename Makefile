@@ -3,12 +3,14 @@ VERSION := 1.0.0
 .PHONY: default
 default:
 	# Compiling...
-	snapcamera
-	enhance
+	make clean
+	make snapcamera
+	make enhance
 
 .PHONY: clean
 clean:
 	rm -rf ./bin/snapcamera
+	rm -rf ./bin/enhance
 
 .PHONY: snapcamera
 snapcamera:

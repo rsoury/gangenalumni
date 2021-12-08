@@ -127,48 +127,6 @@ var (
 			},
 		},
 		{
-			Name:        "Glasses",
-			Probability: 0.3,
-			Types: []EnhancementType{
-				{
-					Name:        "Glasses",
-					Probability: 0.2,
-				},
-				{
-					Name:        "Thick",
-					Probability: 0.1,
-				},
-				{
-					Name:        "Sunglasses",
-					Probability: 0.1,
-				},
-				{
-					Name:        "Thick Rectangle",
-					Probability: 0.1,
-				},
-				{
-					Name:        "Thin Rectangle",
-					Probability: 0.2,
-				},
-				{
-					Name:        "Thin Rectangle 2",
-					Probability: 0.2,
-				},
-				{
-					Name:        "Thick Oval",
-					Probability: 0.1,
-				},
-				{
-					Name:        "Thin Oval",
-					Probability: 0.3,
-				},
-				{
-					Name:        "Thin Oval 2",
-					Probability: 0.1,
-				},
-			},
-		},
-		{
 			Name:        "Sizes",
 			Probability: 0.3,
 			Types: []EnhancementType{

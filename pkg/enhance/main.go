@@ -41,10 +41,9 @@ import (
 )
 
 type IndexedImage struct {
-	Id                  string              `json:"id"`
-	Enhancements        []map[string]string `json:"enhancements"`
-	EnhancedImagePath   string              `json:"enhancedImagePath"`
-	GlassesEnhancements []map[string]string `json:"glassesImagePaths"`
+	Id                string              `json:"id"`
+	Enhancements      []map[string]string `json:"enhancements"`
+	EnhancedImagePath string              `json:"enhancedImagePath"`
 }
 
 type FaceData struct {
@@ -70,7 +69,6 @@ func init() {
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
 	rootCmd.PersistentFlags().StringP("facedata", "f", "", "Path to AWS Face Analysis dataset directory.")
-	rootCmd.PersistentFlags().BoolP("glasses", "g", false, "Apply all glasses enhancements to the post-enhanced image and save each image with glasses enhancement in a different file for human processing.")
 	_ = rootCmd.MarkFlagRequired("source")
 	_ = rootCmd.MarkFlagRequired("facedata")
 }
@@ -90,7 +88,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	facedataDir, _ := cmd.Flags().GetString("facedata")
-	glassesEnhancementManagedSeparately, _ := cmd.Flags().GetBool("glasses")
 	if debugMode {
 		err = os.MkdirAll(fmt.Sprintf("./tmp/enhance-debug/%d", currentTs), 0755) // Create tmp dir for this debug dump
 		if err != nil {
@@ -313,20 +310,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				continue
 			}
 
-			var gEnhancement Enhancement
 			enhancementsApplied := []map[string]string{}
-			rEnhancements := enhancements
-			if glassesEnhancementManagedSeparately {
-				rEnhancements = []Enhancement{}
-				for _, enhancement := range enhancements {
-					if enhancement.Name == "Glasses" {
-						gEnhancement = enhancement
-					} else {
-						rEnhancements = append(rEnhancements, enhancement)
-					}
-				}
-			}
-			for _, enhancement := range rEnhancements {
+			for _, enhancement := range enhancements {
 				applyEnhancement := false
 				eType := EnhancementType{}
 				if enhancement.GenderRequirement != "" {
@@ -336,20 +321,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 				if enhancement.Name == "Beards" {
 					if faceDetails.Beard.Value {
-						applyEnhancement = true
-					}
-				}
-				if enhancement.Name == "Glasses" {
-					// This conditional will not be entered if glassesEnhancementManagedSeparately is true
-					if faceDetails.Sunglasses.Value {
-						applyEnhancement = true
-						for _, t := range enhancement.Types {
-							if t.Name == "Sunglasses" {
-								eType = t
-								break
-							}
-						}
-					} else if faceDetails.Eyeglasses.Value {
 						applyEnhancement = true
 					}
 				}
@@ -390,9 +361,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}, fmt.Sprintf("enhancement-%s", enhancement.Name))
 				if err != nil {
 					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
-					if err != nil {
-						log.Print("ERROR: ", err.Error())
-					}
 					continue
 				}
 				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
@@ -447,7 +415,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
-					err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit from enhancement type selection screen
+					err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit from enhancement screen back to home screen
 					if err != nil {
 						log.Fatal("ERROR: ", err.Error())
 					}
@@ -465,7 +437,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				q.Q("Apply Coords: ", applyCoords)
 				bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
 				robotgo.Click()          // Double click to make sure....
-				robotgo.MilliSleep(1000) // Wait for Apply and return to editor screen animation
+				robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
 				log.Printf("Image ID %v - Enhancements applied\n", imageId)
 
 				enhancementsApplied = append(enhancementsApplied, map[string]string{
@@ -488,9 +460,14 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
 				robotgo.Click()          // Double click to make sure...
 				robotgo.MilliSleep(2000) // Wait for the save button to disappear
+				postSaveImg := robotgo.CaptureImg()
+				if imagesSimilar(editorScreenImg, postSaveImg) {
+					log.Printf("WARN: Image ID %v - Failed to Saved. Added back into loop\n", imageId)
+					detectedFaces = append(detectedFaces, rect) // Add the face back into the loop if there was an error saving for whatever reason
+					continue
+				}
 				log.Printf("Image ID %v - Saved\n", imageId)
-				editorScreenImg = robotgo.CaptureImg()
-				detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 300) // Increase validity integer to prevent detching before & after faces
+				detectedEnhancedFaces := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
 				if len(detectedEnhancedFaces) == 0 {
 					log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
 					continue
@@ -500,7 +477,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
 				}
 				// Save detected enhanced face to output directory
-				enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
+				enhancedFaceImg := imaging.Crop(postSaveImg, detectedEnhancedFaces[0])
 				enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
 				go func() {
 					if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
@@ -518,127 +495,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 			log.Printf("%d enhancements made for Image ID %v\n", len(enhancementsApplied), imageId)
 
-			var glassesEnhancements []map[string]string
-			if glassesEnhancementManagedSeparately && (faceDetails.Sunglasses.Value || faceDetails.Eyeglasses.Value || rand.Float64() <= gEnhancement.Probability) {
-				// After save and return to editor screen, we want to go back and process all glasses types.
-				glassesEnhancementTypes := gEnhancement.ShuffleTypes()
-				log.Printf("Image ID %v - Creating all glasses variations ... \n", imageId)
-				for _, eType := range glassesEnhancementTypes {
-					editorScreenImg := robotgo.CaptureImg()
-					eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-						return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/enhancement-glasses.png", editorScreenImg)
-					}, "enhancement-Glasses")
-					if err != nil {
-						log.Printf("ERROR: Cannot select enhancement Glasses - %v\n", err.Error())
-						err = bluestacks.OsBackClick() // No Exit Modal because we've already saved the previous image
-						if err != nil {
-							log.Fatal("ERROR: ", err.Error())
-						}
-						continue
-					}
-					q.Q("Enhancement Coords: Glasses", eCoords)
-					bluestacks.MoveClick(eCoords.X, eCoords.Y)
-					robotgo.MilliSleep(1000)
-					log.Printf("Image ID %v - Entered into enhancement Glasses\n", imageId)
-
-					log.Printf("Image ID %v - Attempting to enhance using enhancement Glasses type %s ... \n", imageId, eType.Name)
-					editorScreenImg = robotgo.CaptureImg()
-					etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-						return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-glasses-%s.png", strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
-					}, fmt.Sprintf("enhancement-type-%s", eType.Name))
-					q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
-					if err != nil {
-						log.Printf("WARN: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
-						continue
-					}
-					bluestacks.MoveClick(etCoords.X, etCoords.Y)
-					log.Printf("Image ID %v - Enhanced using enhancement Glasses type %s\n", imageId, eType.Name)
-
-					// Apply enhancement to remove the processing loader and enable to save button
-					// Then, Save the image directly after the image glasses enhancement
-					applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-						return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
-					}, "editor-apply")
-					if err != nil {
-						log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
-						continue
-					}
-					q.Q("Apply Coords: ", applyCoords)
-					bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
-					// robotgo.Click()          // Double click to make sure....
-					robotgo.MilliSleep(1000) // Wait for Apply and return to editor screen animation
-					log.Printf("Image ID %v - Glasses enhancement %s applied\n", imageId, eType.Name)
-
-					saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-						return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
-					}, "editor-save")
-					if err != nil {
-						log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())
-						continue
-					}
-					q.Q("Save Coords: ", saveCoords)
-					preSaveImg := robotgo.CaptureImg()
-					bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
-					robotgo.Click()          // Double click to make sure...
-					robotgo.MilliSleep(2000) // Wait for the save button to disappear
-					postSaveImg := robotgo.CaptureImg()
-					if imagesSimilar(preSaveImg, postSaveImg) {
-						// err = bluestacks.ExitScreen(len(enhancementsApplied) > 0 || len(glassesEnhancements) > 0) // Exit from enhancement type selection screen
-						err = bluestacks.OsBackClick() // Return to enhancement selection screen
-						if err != nil {
-							log.Fatal("ERROR: ", err.Error())
-						}
-						// Reselect enhancement glasses
-						bluestacks.MoveClick(eCoords.X, eCoords.Y)
-						robotgo.MilliSleep(1000)
-						log.Printf("Image ID %v - [Post Error Re]Entered into enhancement Glasses\n", imageId)
-						continue
-					}
-					log.Printf("Image ID %v - Saved\n", imageId)
-					editorScreenImg = robotgo.CaptureImg()                                // Capture Save Screen
-					detectedEnhancedFaces := bluestacks.DetectFaces(editorScreenImg, 300) // Increase validity integer to prevent detching before & after faces
-					if len(detectedEnhancedFaces) == 0 {
-						log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
-						continue
-					}
-					if len(detectedEnhancedFaces) > 1 {
-						// This was being hit due to the images inside of then Before & After image.
-						log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
-					}
-					// Save detected enhanced face to output directory
-					enhancedFaceImg := imaging.Crop(editorScreenImg, detectedEnhancedFaces[0])
-					glassesImgPath := path.Join(outputDir, fmt.Sprintf("%v-%v.jpeg", imageId, strings.ReplaceAll(eType.Name, " ", "")))
-					go func() {
-						if gcv.ImgWrite(glassesImgPath, enhancedFaceImg) {
-							log.Printf("Successfully saved detected Glasses/%s enhancement image - %v\n", eType.Name, imageId)
-							glassesEnhancements = append(glassesEnhancements, map[string]string{
-								"type": eType.Name,
-								"path": glassesImgPath,
-							})
-						} else {
-							log.Printf("WARN: Failed to save detected Glasses/%s enhancement image - %v\n", imageId, eType.Name)
-						}
-					}()
-
-					// Use the back button to return to the Editor Enhancement Types Screen
-					err = bluestacks.OsBackClick()
-					if err != nil {
-						log.Fatal("ERROR: ", err.Error())
-					}
-				}
-
-				// Use the back button to return to the Main Editor Screen
-				err = bluestacks.OsBackClick()
-				if err != nil {
-					log.Fatal("ERROR: ", err.Error())
-				}
-			}
-
 			imageIndex = append(imageIndex, IndexedImage{
-				Id:                  imageId,
-				Enhancements:        enhancementsApplied,
-				EnhancedImagePath:   enhancedFaceImgPath,
-				GlassesEnhancements: glassesEnhancements,
+				Id:                imageId,
+				Enhancements:      enhancementsApplied,
+				EnhancedImagePath: enhancedFaceImgPath,
 			})
 		}
 
