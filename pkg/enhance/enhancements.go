@@ -149,7 +149,8 @@ var (
 
 // Shuffle the Types and return a new Types array
 func (e *Enhancement) ShuffleTypes() []EnhancementType {
-	vals := e.Types
+	var vals []EnhancementType
+	vals = append(vals, e.Types...) // Cleaner copy
 
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	ret := make([]EnhancementType, len(vals))
