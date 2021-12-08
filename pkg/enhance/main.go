@@ -36,7 +36,6 @@ import (
 	"github.com/go-vgo/robotgo"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
-	"github.com/vitali-fedulov/images/v2"
 	"gocv.io/x/gocv"
 )
 
@@ -69,6 +68,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("output", "o", "./output/step2.1", "Path to local output directory.")
 	rootCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source image directory where image ids will be deduced.")
 	rootCmd.PersistentFlags().StringP("facedata", "f", "", "Path to AWS Face Analysis dataset directory.")
+	rootCmd.PersistentFlags().Int("max-iterations", 0, "Max number of scroll iterations of enhancements.")
 	_ = rootCmd.MarkFlagRequired("source")
 	_ = rootCmd.MarkFlagRequired("facedata")
 }
@@ -88,6 +88,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	facedataDir, _ := cmd.Flags().GetString("facedata")
+	maxIterations, _ := cmd.Flags().GetInt("max-iterations")
 	if debugMode {
 		err = os.MkdirAll(fmt.Sprintf("./tmp/enhance-debug/%d", currentTs), 0755) // Create tmp dir for this debug dump
 		if err != nil {
@@ -145,19 +146,19 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	var screenImg image.Image
 	i := 0
 	for {
-		// These control coordinates only really need to be obtained once... and then reused accordingly.
-		// For each of the faces -- return the gallery
+		// For each iteration -- return the gallery... this way we can proceed with the next face directly from the gallery, and can scroll within the gallery.
 		err = bluestacks.MoveToSharedFolderFromHome()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
 
 		// Detect or iterate over the next face
-		var rect image.Rectangle
 		if len(detectedFaces) == 0 {
-			if i > 0 {
-				//! Test -- If not the first iteration AND detectedFaces is empty.
-				break
+			// TODO: Solve this maxIterations not actually limiting correctly and/or scrolling is not working
+			if maxIterations > 0 {
+				if i > maxIterations-1 {
+					break
+				}
 			}
 			// Execute scroll behaviour here -- Do not compare pre/post images on first iteration as there will be no scroll
 			// If we cannot scroll anymore, break the loop
@@ -168,13 +169,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
 					robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
 					robotgo.MilliSleep(250)
-					robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-240)
+					robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-200)
 				}
 				robotgo.MilliSleep(250)
 				postImg := robotgo.CaptureImg()
-				hashA, imgSizeA := images.Hash(preImg)
-				hashB, imgSizeB := images.Hash(postImg)
-				if images.Similar(hashA, hashB, imgSizeA, imgSizeB) {
+				if imagesSimilar(preImg, postImg) {
 					// If after scrolling, the screen is the same, the break... -- this means that there are no more images to scroll
 					theEnd = true
 					break
@@ -183,10 +182,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			if theEnd {
 				break
 			}
+
 			screenImg = robotgo.CaptureImg()
 			detectedFaces = bluestacks.DetectFaces(screenImg, 100)
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), i)
 		}
+
+		var rect image.Rectangle
 		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
 
 		// Run the enhancement process inside of this loop
@@ -364,7 +366,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 				editorScreenImg = robotgo.CaptureImg()
 				if eType.ScrollRequirement > 0 {
-					q.Q(enhancement.Types)
 					var scrollReferenceEnhancementType EnhancementType
 					for _, t := range enhancement.Types {
 						if t.ScrollRequirement == 0 {
@@ -380,10 +381,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
 					if err != nil {
 						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
-						err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit from enhancement type selection screen
+						err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
 						if err != nil {
 							log.Fatal("ERROR: ", err.Error())
 						}
+						robotgo.MilliSleep(1000)
 						continue
 					}
 					scrollIterations := int(math.Round(float64(eType.ScrollRequirement) / 200.0))
@@ -401,8 +403,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
 					}()
 				}
+
 				log.Printf("Image ID %v - Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
-				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(eType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", eType.Name))
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
 				}, fmt.Sprintf("enhancement-type-%s", eType.Name))
@@ -451,13 +453,33 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					continue
 				}
 				q.Q("Save Coords: ", saveCoords)
-				bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
-				robotgo.Click()          // Double click to make sure...
-				robotgo.MilliSleep(2000) // Wait for the save button to disappear
-				postSaveImg := robotgo.CaptureImg()
-				if imagesSimilar(editorScreenImg, postSaveImg) {
+				saveCount := 0
+				isSaved := false
+				var postSaveImg image.Image
+				for {
+					bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
+					robotgo.Click()          // Double click to make sure...
+					robotgo.MilliSleep(2000) // Wait for the save button to disappear
+					postSaveImg = robotgo.CaptureImg()
+					if imagesSimilar(editorScreenImg, postSaveImg) {
+						saveCount++
+					} else {
+						isSaved = true
+						break
+					}
+					if saveCount > 4 {
+						// Try 5 times
+						break
+					}
+				}
+				if !isSaved {
 					log.Printf("WARN: Image ID %v - Failed to Saved. Added back into loop\n", imageId)
-					detectedFaces = append(detectedFaces, rect) // Add the face back into the loop if there was an error saving for whatever reason
+					detectedFaces = append(detectedFaces, rect)               // Add the face back into the loop if there was an error saving for whatever reason
+					err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					robotgo.MilliSleep(1000)
 					continue
 				}
 				log.Printf("Image ID %v - Saved\n", imageId)

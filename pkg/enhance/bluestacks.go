@@ -365,6 +365,7 @@ func (b *BlueStacks) ExitScreen(shouldExitModal bool) error {
 		return err
 	}
 	if shouldExitModal {
+		robotgo.MilliSleep(1000)
 		exitModalScreen := robotgo.CaptureImg()
 		exitCoords, err := b.GetCoordsWithCache(func() (Coords, error) {
 			return b.GetImagePathCoordsInImage("./assets/faceapp/exit.png", exitModalScreen)
