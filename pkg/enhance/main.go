@@ -157,10 +157,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		i++
 
 		// For each iteration -- return the gallery... this way we can proceed with the next face directly from the gallery, and can scroll within the gallery.
-		err = bluestacks.MoveToSharedFolderFromHome()
-		if err != nil {
-			log.Fatal("ERROR: ", err.Error())
-		}
+		// err = bluestacks.MoveToSharedFolderFromHome()
+		// if err != nil {
+		// 	log.Fatal("ERROR: ", err.Error())
+		// }
 		// We'll need to scroll to these images for each iteration -- ie. each time the gallery is reached, the scroll from the top is executed.
 		// If we cannot scroll anymore, break the loop
 		theEnd := false
@@ -169,8 +169,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			preImg := robotgo.CaptureImg()
 			for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
 				robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
-				robotgo.MilliSleep(500)
-				robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-115) //* No matter what scroll dimension we provide, the amount of scroll seems to differ slightly.
+				// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230, 1.0, 1.0)
+				// robotgo.MouseToggle("down")
+				// robotgo.MoveSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230)
+				// robotgo.MilliSleep(500)
+				// robotgo.MouseToggle("up")
+				robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-185, 3.0, 5.0)
+				// robotgo.MilliSleep(500)
 			}
 			robotgo.MilliSleep(500)
 			postImg := robotgo.CaptureImg()
@@ -222,6 +227,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 		var rect image.Rectangle
 		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
+
+		//! TEST -- Scrolling
+		detectedFaces = []image.Rectangle{}
+		setOfFacesProcessed++
+		// err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
+		// if err != nil {
+		// 	log.Fatal("ERROR: ", err.Error())
+		// }
+		continue
 
 		if len(detectedFaces) == 0 {
 			// The set of faces process -- should index after we've emptied the detected faces for processing.
@@ -334,34 +348,40 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// 3. Click on the face to load it
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
 		log.Printf("[Face %d] Image ID %v selected...\n", i, imageId)
-		robotgo.MilliSleep(250)
-		editorScreenImg := robotgo.CaptureImg()
-		if debugMode {
-			go func() {
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-ID-%v--editor-screen.jpg", currentTs, i, imageId), editorScreenImg)
-			}()
-		}
 
-		// 4. Wait for the face to appear
+		// 4. Wait for the an enhancement to show
 		count := 0
-		var validRects []image.Rectangle
+		selectedFaceLoaded := false
 		for {
 			count++
 			robotgo.MilliSleep(2000)
-			validRects = bluestacks.DetectFaces(editorScreenImg, 300)
-			if len(validRects) > 0 || count > 10 {
-				break
+			editorScreenImg := robotgo.CaptureImg()
+			// if debugMode {
+			// 	go func() {
+			// 		gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-ID-%v--editor-screen-%d.jpg", currentTs, i, imageId, count), editorScreenImg)
+			// 	}()
+			// }
+			_, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancements[0].Name, " ", "-"))), editorScreenImg)
+			if err != nil {
+				if count > 10 {
+					break
+				}
+				continue
 			}
+			selectedFaceLoaded = true
+			break
 		}
 		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
-		if len(validRects) == 0 {
-			log.Printf("WARN: [Face %d] No detection after selection...\n", i)
+		if !selectedFaceLoaded {
+			log.Printf("WARN: [Face %d] No enhancements detected after selection...\n", i)
 			err = bluestacks.OsBackClick() // Exit back to home screen
 			if err != nil {
 				log.Fatal("ERROR: ", err.Error())
 			}
 			continue
 		}
+
+		editorScreenImg := robotgo.CaptureImg()
 
 		log.Printf("[Face %d] Starting enhancement for Image ID %v ...\n", i, imageId)
 
@@ -390,6 +410,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				X: genderSwitchXCoord,
 				Y: coords.Y,
 			}, err
+			// return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gender-switch-icon.png", editorScreenImg)
 		}, "editor-gender-switch-icon")
 		if err != nil {
 			log.Printf("ERROR: Cannot select gender switch icon - %v\n", err.Error())
