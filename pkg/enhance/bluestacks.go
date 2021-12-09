@@ -293,11 +293,6 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 		galleryControlCoords = v
 	} else {
 		screenImg := robotgo.CaptureImg()
-		if debugMode {
-			go func() {
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-0.jpg", currentTs), screenImg)
-			}()
-		}
 		galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
 		if err != nil {
 			return err
@@ -312,11 +307,6 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 		folderFilterControlCoords = v
 	} else {
 		screenImg := robotgo.CaptureImg()
-		if debugMode {
-			go func() {
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-1.jpg", currentTs), screenImg)
-			}()
-		}
 		folderFilterControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
 		if err != nil {
 			return err
