@@ -144,91 +144,92 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 	var detectedFaces []image.Rectangle
 	var screenImg image.Image
-	i := 0
+	i := -1                  // Iterates for each face that is processed... not just an iteration for each set of faces
+	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
 	for {
+		if maxIterations > 0 {
+			if setOfFacesProcessed > maxIterations-1 {
+				break
+			}
+		}
+
+		// Iterate the count
+		i++
+
 		// For each iteration -- return the gallery... this way we can proceed with the next face directly from the gallery, and can scroll within the gallery.
 		err = bluestacks.MoveToSharedFolderFromHome()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
+		// We'll need to scroll to these images for each iteration -- ie. each time the gallery is reached, the scroll from the top is executed.
+		// If we cannot scroll anymore, break the loop
+		theEnd := false
+		for s := 0; s < setOfFacesProcessed; s++ {
+			// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
+			preImg := robotgo.CaptureImg()
+			for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
+				robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
+				robotgo.MilliSleep(500)
+				robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-115) //* No matter what scroll dimension we provide, the amount of scroll seems to differ slightly.
+			}
+			robotgo.MilliSleep(500)
+			postImg := robotgo.CaptureImg()
+			if imagesSimilar(preImg, postImg) {
+				// If after scrolling, the screen is the same, the break... -- this means that there are no more images to scroll
+				theEnd = true
+				break
+			}
+		}
+		if theEnd {
+			break
+		}
 
 		// Detect or iterate over the next face
 		if len(detectedFaces) == 0 {
-			// TODO: Solve this maxIterations not actually limiting correctly and/or scrolling is not working
-			if maxIterations > 0 {
-				if i > maxIterations-1 {
-					break
-				}
-			}
-			// Execute scroll behaviour here -- Do not compare pre/post images on first iteration as there will be no scroll
-			// If we cannot scroll anymore, break the loop
-			theEnd := false
-			for s := 0; s < i; s++ {
-				// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
-				preImg := robotgo.CaptureImg()
-				for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
-					robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
-					robotgo.MilliSleep(250)
-					robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-200)
-				}
-				robotgo.MilliSleep(250)
-				postImg := robotgo.CaptureImg()
-				if imagesSimilar(preImg, postImg) {
-					// If after scrolling, the screen is the same, the break... -- this means that there are no more images to scroll
-					theEnd = true
-					break
-				}
-			}
-			if theEnd {
-				break
-			}
-
 			screenImg = robotgo.CaptureImg()
 			detectedFaces = bluestacks.DetectFaces(screenImg, 100)
-			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), i)
+			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), setOfFacesProcessed)
+			if debugMode {
+				// color for the rect when faces detected
+				borderColor := color.RGBA{0, 0, 255, 0}
+				if setOfFacesProcessed%2 == 0 {
+					borderColor = color.RGBA{255, 0, 0, 0}
+				}
+				// draw a rectangle around each face on the original image,
+				// along with text identifing as "Human"
+				screenMat, _ := gocv.ImageToMatRGB(screenImg)
+				defer screenMat.Close()
+				for _, r := range detectedFaces {
+					gocv.Rectangle(&screenMat, r, borderColor, 3)
+
+					size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
+					pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
+					gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, borderColor, 2)
+				}
+
+				if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-screen-%d.jpg", currentTs, setOfFacesProcessed), screenMat) {
+					log.Printf("Successfully created image with %d faces detected\n", len(detectedFaces))
+				} else {
+					log.Printf("Failed to create image with %d faces detected\n", len(detectedFaces))
+				}
+			}
 		}
 
 		var rect image.Rectangle
 		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
 
+		if len(detectedFaces) == 0 {
+			// The set of faces process -- should index after we've emptied the detected faces for processing.
+			// This increases the counter after we've emptied the detected faces array. This means that after the last face has been removed from the array for processing, we index, so that the next iteration where detection wll execute will also scroll prior to detection.
+			setOfFacesProcessed++
+		}
+
 		// Run the enhancement process inside of this loop
-
-		// 1. Click on the face to load it
 		faceCoords := bluestacks.GetCoords((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2, screenImg)
-		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
-		log.Printf("Face %d selected...\n", i)
 
-		// 2. Wait for the face to appear
-		count := 0
-		var validRects []image.Rectangle
-		for {
-			count++
-			robotgo.MilliSleep(2000)
-			validRects = bluestacks.DetectFaces(screenImg, 100)
-			if len(validRects) > 0 || count > 10 {
-				break
-			}
-		}
-		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
-		if len(validRects) == 0 {
-			log.Printf("WARN: Face %d has not been detected after selection...\n", i)
-			err = bluestacks.OsBackClick()
-			if err != nil {
-				log.Fatal("ERROR: ", err.Error())
-			}
-			continue
-		}
-		log.Printf("Face %d has been detected...\n", i)
-
-		// 3. Once the face is detected, match it against the images in the source directory.
-		// -- Use the face that was detected before the click to enhance -- This prevents the zoom out requirement
+		// Crop the detected the face within the gallery, and match it against the images in the source directory.
+		// -- Using the face that was detected before the click to enhance -- This prevents the zoom out requirement
 		detectedImg := imaging.Crop(screenImg, rect)
-		if debugMode {
-			go func() {
-				// gcv.ImgWrite("./tmp/enhance-debug/"+currentTsStr+"/face-"+strconv.Itoa(i)+"-"+strconv.Itoa(faceCoords.X)+"x"+strconv.Itoa(faceCoords.Y)+".jpg", detectedImg)
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-%dx%d.jpg", currentTs, i, faceCoords.X, faceCoords.Y), detectedImg)
-			}()
-		}
 		detectedImgBytes, _ := ImageToBytes(detectedImg)
 		// AWS call for face search
 		searchResult, err := awsClient.SearchFacesByImage(ctx, &rekognition.SearchFacesByImageInput{
@@ -258,299 +259,310 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// Now that we have the matched face, we can produce the enhancement, then detect the enhanced face to save against the matched image id.
 		imageId := *matchedFace.Face.ExternalImageId
 
-		log.Printf("Face %d Image ID %v has been identified\n", i, imageId)
+		log.Printf("[Face %d] Image ID %v has been identified\n", i, imageId)
+		if debugMode {
+			go func() {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-ID-%v.jpg", currentTs, i, imageId), detectedImg)
+			}()
+		}
 
-		// First, check if the image has already been enhanced
-		// 0. Check if the face has already been enhanced
+		//! TEST
+		imageIndex = append(imageIndex, IndexedImage{
+			Id: imageId,
+		})
+		// Check if the face has already been enhanced
 		alreadyEnhanced := false
 		for _, indexedImage := range imageIndex {
 			if indexedImage.Id == imageId {
-				log.Printf("Face %d Image ID %v has already been enhanced", i, imageId)
 				alreadyEnhanced = true
 				break
 			}
 		}
 
-		if !alreadyEnhanced {
-			log.Printf("Starting enhancement for Face %d Image ID %v ...\n", i, imageId)
+		// Continue with the next iteration if this face has already been enhanced.
+		if alreadyEnhanced {
+			log.Printf("[Face %d] Image ID %v has already been enhanced", i, imageId)
+			err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
+		}
 
-			// Run the enhancement process here.
-			// 1. Determine the enhancements
-			// -- 1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
-			// -- 2. Check if user has glasses -- add glasses -- random selection
-			// -- 3. Check if female, and probability for make up -- add make up -- random selection
-			// -- 4. Plus size the person by chance too -- there should be heavier people.
-			// 2. Iterate and apply the enhancements
-			// -- 1. Select enhancement
-			// -- 2. Wait for the processing text to no longer show
-			// -- 3. Select the Apply text
-			// -- 4. Select the Save text
-			// -- 5. Detect the image inside of the Save Screen
-			// -- 6. Click the back button -- to get back to the Editor
+		// 1. Click on the face to load it
+		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
+		log.Printf("[Face %d] Image ID %v selected...\n", i, imageId)
 
-			// facedataMap := map[string]interface{}{}
-			facedata := FaceData{}
-			for _, facedataPath := range facedataPaths {
-				filename := filepath.Base(facedataPath)
-				extension := filepath.Ext(filename)
-				name := filename[0 : len(filename)-len(extension)]
-				if name == imageId {
-					// Read the file and unmarshal the data
-					file, _ := ioutil.ReadFile(facedataPath)
-					_ = json.Unmarshal([]byte(file), &facedata)
-					break
+		// 2. Wait for the face to appear
+		count := 0
+		var validRects []image.Rectangle
+		for {
+			count++
+			robotgo.MilliSleep(2000)
+			validRects = bluestacks.DetectFaces(screenImg, 100)
+			if len(validRects) > 0 || count > 10 {
+				break
+			}
+		}
+		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
+		if len(validRects) == 0 {
+			log.Printf("WARN: [Face %d] No detection after selection...\n", i)
+			err = bluestacks.OsBackClick() // Exit back to home screen
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
+		}
+
+		log.Printf("[Face %d] Starting enhancement for Image ID %v ...\n", i, imageId)
+
+		// 3. Run the enhancement process here.
+
+		// 3.1. Determine the enhancements
+		// -- 3.1.1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
+		// -- 3.1.2. Check if user has glasses -- add glasses -- random selection
+		// -- 3.1.3. Check if female, and probability for make up -- add make up -- random selection
+		// -- 3.1.4. Plus size the person by chance too -- there should be heavier people.
+		// 3.2. Iterate and apply the enhancements
+		// -- 3.2.1. Select enhancement
+		// -- 3.2.2. Wait for the processing text to no longer show
+		// -- 3.2.3. Select the Apply text
+		// -- 3.2.4. Select the Save text
+		// -- 3.2.5. Detect the image inside of the Save Screen
+		// -- 3.2.6. Click the back button -- to get back to the Editor
+
+		facedata := FaceData{}
+		for _, facedataPath := range facedataPaths {
+			filename := filepath.Base(facedataPath)
+			extension := filepath.Ext(filename)
+			name := filename[0 : len(filename)-len(extension)]
+			if name == imageId {
+				// Read the file and unmarshal the data
+				file, _ := ioutil.ReadFile(facedataPath)
+				_ = json.Unmarshal([]byte(file), &facedata)
+				break
+			}
+		}
+
+		faceDetails := facedata.FaceDetails[0]
+		if (*faceDetails.AgeRange.Low) < 16 {
+			log.Printf("Character is underage - Image ID %v\n", imageId)
+			err = bluestacks.OsBackClick()
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
+		}
+
+		enhancementsApplied := []map[string]string{}
+		for _, enhancement := range enhancements {
+			applyEnhancement := false
+			eType := EnhancementType{}
+			if enhancement.GenderRequirement != "" {
+				if enhancement.GenderRequirement != string(faceDetails.Gender.Value) {
+					continue
+				}
+			}
+			if enhancement.Name == "Beards" {
+				if faceDetails.Beard.Value {
+					applyEnhancement = true
+				}
+			}
+			if !applyEnhancement {
+				// Apply probabilty for enhancement
+				applyEnhancement = rand.Float64() <= enhancement.Probability
+			}
+			if !applyEnhancement {
+				continue
+			}
+			if len(eType.Name) == 0 {
+				// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
+				enhancementTypes := enhancement.ShuffleTypes()
+				for typeIndex := 0; typeIndex < len(enhancementTypes); typeIndex++ {
+					if rand.Float64() <= enhancementTypes[typeIndex].Probability {
+						eType = enhancementTypes[typeIndex]
+						break
+					} else {
+						enhancementTypes[typeIndex].Probability = enhancementTypes[typeIndex].Probability * 1.2
+						if enhancementTypes[typeIndex].Probability > 1.0 {
+							enhancementTypes[typeIndex].Probability = 1.0
+						}
+					}
 				}
 			}
 
-			faceDetails := facedata.FaceDetails[0]
-			if (*faceDetails.AgeRange.Low) < 18 {
-				log.Printf("Character is underage - Image ID %v\n", imageId)
-				err = bluestacks.OsBackClick()
+			// proceed with enhancement
+			log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
+			editorScreenImg := robotgo.CaptureImg()
+			eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
+			}, fmt.Sprintf("enhancement-%s", enhancement.Name))
+			if err != nil {
+				log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
+				continue
+			}
+			q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
+			bluestacks.MoveClick(eCoords.X, eCoords.Y)
+			robotgo.MilliSleep(1000)
+			log.Printf("Image ID %v - Entered into enhancement %s\n", imageId, enhancement.Name)
+
+			editorScreenImg = robotgo.CaptureImg()
+			if eType.ScrollRequirement > 0 {
+				var scrollReferenceEnhancementType EnhancementType
+				for _, t := range enhancement.Types {
+					if t.ScrollRequirement == 0 {
+						scrollReferenceEnhancementType = t
+						break
+					}
+				}
+				log.Printf("Image ID %v - Finding scroll reference of type %s to find enhancement %s type %s ... \n", imageId, scrollReferenceEnhancementType.Name, enhancement.Name, eType.Name)
+				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
+				}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
+				q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
+				if err != nil {
+					log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
+					err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+					robotgo.MilliSleep(1000)
+					continue
+				}
+				scrollIterations := int(math.Round(float64(eType.ScrollRequirement) / 200.0))
+				for s := 0; s < scrollIterations; s++ {
+					robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
+					robotgo.MilliSleep(500)
+					robotgo.DragSmooth(bluestacks.CenterCoords.X-200, etCoords.Y)
+				}
+				robotgo.MilliSleep(1000)
+				editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
+				log.Printf("Image ID %v - Horizontal scroll to find enhancement %s type %s\n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
+			}
+			if debugMode {
+				go func() {
+					gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
+				}()
+			}
+
+			log.Printf("Image ID %v - Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
+			etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
+			}, fmt.Sprintf("enhancement-type-%s", eType.Name))
+			q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
+			if err != nil {
+				log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
+				err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
+				if err != nil {
+					log.Fatal("ERROR: ", err.Error())
+				}
+				err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit from enhancement screen back to home screen
 				if err != nil {
 					log.Fatal("ERROR: ", err.Error())
 				}
 				continue
 			}
-
-			enhancementsApplied := []map[string]string{}
-			for _, enhancement := range enhancements {
-				applyEnhancement := false
-				eType := EnhancementType{}
-				if enhancement.GenderRequirement != "" {
-					if enhancement.GenderRequirement != string(faceDetails.Gender.Value) {
-						continue
-					}
-				}
-				if enhancement.Name == "Beards" {
-					if faceDetails.Beard.Value {
-						applyEnhancement = true
-					}
-				}
-				if !applyEnhancement {
-					// Apply probabilty for enhancement
-					applyEnhancement = rand.Float64() <= enhancement.Probability
-				}
-				if !applyEnhancement {
-					continue
-				}
-				if len(eType.Name) == 0 {
-					// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
-					enhancementTypes := enhancement.ShuffleTypes()
-					for typeIndex := 0; typeIndex < len(enhancementTypes); typeIndex++ {
-						if rand.Float64() <= enhancementTypes[typeIndex].Probability {
-							eType = enhancementTypes[typeIndex]
-							break
-						} else {
-							enhancementTypes[typeIndex].Probability = enhancementTypes[typeIndex].Probability * 1.2
-							if enhancementTypes[typeIndex].Probability > 1.0 {
-								enhancementTypes[typeIndex].Probability = 1.0
-							}
-						}
-					}
-				}
-
-				// proceed with enhancement
-				log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
-				editorScreenImg := robotgo.CaptureImg()
-				eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
-				}, fmt.Sprintf("enhancement-%s", enhancement.Name))
-				if err != nil {
-					log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
-					continue
-				}
-				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
-				bluestacks.MoveClick(eCoords.X, eCoords.Y)
-				robotgo.MilliSleep(1000)
-				log.Printf("Image ID %v - Entered into enhancement %s\n", imageId, enhancement.Name)
-
-				editorScreenImg = robotgo.CaptureImg()
-				if eType.ScrollRequirement > 0 {
-					var scrollReferenceEnhancementType EnhancementType
-					for _, t := range enhancement.Types {
-						if t.ScrollRequirement == 0 {
-							scrollReferenceEnhancementType = t
-							break
-						}
-					}
-					log.Printf("Image ID %v - Finding scroll reference of type %s to find enhancement %s type %s ... \n", imageId, scrollReferenceEnhancementType.Name, enhancement.Name, eType.Name)
-					// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
-					etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-						return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
-					}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
-					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
-					if err != nil {
-						log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
-						err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
-						if err != nil {
-							log.Fatal("ERROR: ", err.Error())
-						}
-						robotgo.MilliSleep(1000)
-						continue
-					}
-					scrollIterations := int(math.Round(float64(eType.ScrollRequirement) / 200.0))
-					for s := 0; s < scrollIterations; s++ {
-						robotgo.Move(bluestacks.CenterCoords.X, etCoords.Y)
-						robotgo.MilliSleep(500)
-						robotgo.DragSmooth(bluestacks.CenterCoords.X-200, etCoords.Y)
-					}
-					robotgo.MilliSleep(1000)
-					editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
-					log.Printf("Image ID %v - Horizontal scroll to find enhancement %s type %s\n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
-				}
-				if debugMode {
-					go func() {
-						gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/editor-screen-%s--%d.jpg", currentTs, eType.Name, time.Now().Unix()), editorScreenImg)
-					}()
-				}
-
-				log.Printf("Image ID %v - Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
-				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
-				}, fmt.Sprintf("enhancement-type-%s", eType.Name))
-				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
-				if err != nil {
-					log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
-					err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
-					if err != nil {
-						log.Fatal("ERROR: ", err.Error())
-					}
-					err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit from enhancement screen back to home screen
-					if err != nil {
-						log.Fatal("ERROR: ", err.Error())
-					}
-					continue
-				}
-				bluestacks.MoveClick(etCoords.X, etCoords.Y)
-				log.Printf("Image ID %v - Enhanced using enhancement %s type %s\n", imageId, enhancement.Name, eType.Name)
-				applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-					return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
-				}, "editor-apply")
-				if err != nil {
-					log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
-					continue
-				}
-				q.Q("Apply Coords: ", applyCoords)
-				bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
-				robotgo.Click()          // Double click to make sure....
-				robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
-				log.Printf("Image ID %v - Enhancements applied\n", imageId)
-
-				enhancementsApplied = append(enhancementsApplied, map[string]string{
-					"name": enhancement.Name,
-					"type": eType.Name,
-				})
+			bluestacks.MoveClick(etCoords.X, etCoords.Y)
+			log.Printf("Image ID %v - Enhanced using enhancement %s type %s\n", imageId, enhancement.Name, eType.Name)
+			applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
+			}, "editor-apply")
+			if err != nil {
+				log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
+				continue
 			}
+			q.Q("Apply Coords: ", applyCoords)
+			bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
+			robotgo.Click()          // Double click to make sure....
+			robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
+			log.Printf("Image ID %v - Enhancements applied\n", imageId)
 
-			enhancedFaceImgPath := ""
-			if len(enhancementsApplied) > 0 {
-				editorScreenImg := robotgo.CaptureImg()
-				saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-					return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
-				}, "editor-save")
-				if err != nil {
-					log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())
-					continue
-				}
-				q.Q("Save Coords: ", saveCoords)
-				saveCount := 0
-				isSaved := false
-				var postSaveImg image.Image
-				for {
-					bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
-					robotgo.Click()          // Double click to make sure...
-					robotgo.MilliSleep(2000) // Wait for the save button to disappear
-					postSaveImg = robotgo.CaptureImg()
-					if imagesSimilar(editorScreenImg, postSaveImg) {
-						saveCount++
-					} else {
-						isSaved = true
-						break
-					}
-					if saveCount > 4 {
-						// Try 5 times
-						break
-					}
-				}
-				if !isSaved {
-					log.Printf("WARN: Image ID %v - Failed to Saved. Added back into loop\n", imageId)
-					detectedFaces = append(detectedFaces, rect)               // Add the face back into the loop if there was an error saving for whatever reason
-					err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
-					if err != nil {
-						log.Fatal("ERROR: ", err.Error())
-					}
-					robotgo.MilliSleep(1000)
-					continue
-				}
-				log.Printf("Image ID %v - Saved\n", imageId)
-				detectedEnhancedFaces := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
-				if len(detectedEnhancedFaces) == 0 {
-					log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
-					continue
-				}
-				if len(detectedEnhancedFaces) > 1 {
-					// This was being hit due to the images inside of then Before & After image.
-					log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
-				}
-				// Save detected enhanced face to output directory
-				enhancedFaceImg := imaging.Crop(postSaveImg, detectedEnhancedFaces[0])
-				enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
-				go func() {
-					if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
-						log.Printf("Successfully saved detected enhanced image - %v\n", imageId)
-					} else {
-						log.Printf("WARN: Failed to save detected enhanced image - %v\n", imageId)
-					}
-				}()
-
-				// Use the back button to return to the Editor Screen
-				err = bluestacks.OsBackClick()
-				if err != nil {
-					log.Fatal("ERROR: ", err.Error())
-				}
-			}
-			log.Printf("%d enhancements made for Image ID %v\n", len(enhancementsApplied), imageId)
-
-			imageIndex = append(imageIndex, IndexedImage{
-				Id:                imageId,
-				Enhancements:      enhancementsApplied,
-				EnhancedImagePath: enhancedFaceImgPath,
+			enhancementsApplied = append(enhancementsApplied, map[string]string{
+				"name": enhancement.Name,
+				"type": eType.Name,
 			})
 		}
 
-		// Use the back button to return to the Home Screen
+		enhancedFaceImgPath := ""
+		if len(enhancementsApplied) > 0 {
+			editorScreenImg := robotgo.CaptureImg()
+			saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+				return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
+			}, "editor-save")
+			if err != nil {
+				log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())
+				continue
+			}
+			q.Q("Save Coords: ", saveCoords)
+			saveCount := 0
+			isSaved := false
+			var postSaveImg image.Image
+			for {
+				bluestacks.MoveClick(saveCoords.X, saveCoords.Y)
+				robotgo.Click()          // Double click to make sure...
+				robotgo.MilliSleep(2000) // Wait for the save button to disappear
+				postSaveImg = robotgo.CaptureImg()
+				if imagesSimilar(editorScreenImg, postSaveImg) {
+					saveCount++
+				} else {
+					isSaved = true
+					break
+				}
+				if saveCount > 4 {
+					// Try 5 times
+					break
+				}
+			}
+			if !isSaved {
+				log.Printf("WARN: [Face %d] Image ID %v - Failed to Saved. Added back into loop\n", i, imageId)
+				detectedFaces = append(detectedFaces, rect)               // Add the face back into the loop if there was an error saving for whatever reason
+				err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
+				if err != nil {
+					log.Fatal("ERROR: ", err.Error())
+				}
+				robotgo.MilliSleep(1000)
+				continue
+			}
+			log.Printf("[Face %d] Image ID %v - Saved\n", i, imageId)
+			detectedEnhancedFaces := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
+			if len(detectedEnhancedFaces) == 0 {
+				log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
+				continue
+			}
+			if len(detectedEnhancedFaces) > 1 {
+				// This was being hit due to the images inside of then Before & After image.
+				log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
+			}
+			// Save detected enhanced face to output directory
+			enhancedFaceImg := imaging.Crop(postSaveImg, detectedEnhancedFaces[0])
+			enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
+			go func() {
+				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
+					log.Printf("Successfully saved detected enhanced image - %v\n", imageId)
+				} else {
+					log.Printf("WARN: Failed to save detected enhanced image - %v\n", imageId)
+				}
+			}()
+
+			// Use the back button to return to the Editor Screen
+			err = bluestacks.OsBackClick()
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+		}
+		log.Printf("[Face %d] %d enhancements made for Image ID %v\n", i, len(enhancementsApplied), imageId)
+
+		imageIndex = append(imageIndex, IndexedImage{
+			Id:                imageId,
+			Enhancements:      enhancementsApplied,
+			EnhancedImagePath: enhancedFaceImgPath,
+		})
+
+		// Use the back button to return to the Home Screen -- Exit the Editor Screen.
 		err = bluestacks.OsBackClick()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
-		}
-
-		// Iterate the count
-		i++
-
-		if debugMode {
-			if len(detectedFaces) == 0 {
-				go func() {
-					// color for the rect when faces detected
-					blue := color.RGBA{0, 0, 255, 0}
-					// draw a rectangle around each face on the original image,
-					// along with text identifing as "Human"
-					screenMat, _ := gocv.ImageToMatRGB(screenImg)
-					defer screenMat.Close()
-					for _, r := range detectedFaces {
-						gocv.Rectangle(&screenMat, r, blue, 3)
-
-						size := gocv.GetTextSize("Human", gocv.FontHersheyPlain, 1.2, 2)
-						pt := image.Pt(r.Min.X+(r.Min.X/2)-(size.X/2), r.Min.Y-2)
-						gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, blue, 2)
-					}
-
-					if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-%d.jpg", currentTs, i), screenMat) {
-						log.Printf("Successfully created image with faces detected\n")
-					} else {
-						log.Printf("Failed to create image with faces detected\n")
-					}
-				}()
-			}
 		}
 	}
 

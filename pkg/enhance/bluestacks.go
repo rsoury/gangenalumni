@@ -6,7 +6,6 @@ import (
 	"image"
 	"log"
 	"math"
-	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-vgo/robotgo"
@@ -212,11 +211,11 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 		// Then process the results to determine the most common coordinate location on the sourceImg
 		srcMat, _ := gocv.ImageToMatRGB(rImg)
 		defer srcMat.Close()
-		if debugMode {
-			go func() {
-				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-resized-%d.jpg", currentTs, time.Now().Unix()), rImg)
-			}()
-		}
+		// if debugMode {
+		// 	go func() {
+		// 		gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-resized-%d.jpg", currentTs, time.Now().Unix()), rImg)
+		// 	}()
+		// }
 		_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
 
 		r := CVResult{
