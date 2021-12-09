@@ -266,10 +266,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}()
 		}
 
-		//! TEST
-		imageIndex = append(imageIndex, IndexedImage{
-			Id: imageId,
-		})
+		// // TEST
+		// imageIndex = append(imageIndex, IndexedImage{
+		// 	Id: imageId,
+		// })
+
 		// Check if the face has already been enhanced
 		alreadyEnhanced := false
 		for _, indexedImage := range imageIndex {
