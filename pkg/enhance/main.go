@@ -187,14 +187,14 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		// Detect or iterate over the next face
 		if len(detectedFaces) == 0 {
 			screenImg = robotgo.CaptureImg()
-			detectedFaces = bluestacks.DetectFaces(screenImg, 100)
+			detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), setOfFacesProcessed)
 			if debugMode {
 				// color for the rect when faces detected
 				borderColor := color.RGBA{0, 0, 255, 0}
-				if setOfFacesProcessed%2 == 0 {
-					borderColor = color.RGBA{255, 0, 0, 0}
-				}
+				// if setOfFacesProcessed%2 == 0 {
+				// 	borderColor = color.RGBA{255, 0, 0, 0}
+				// }
 				// draw a rectangle around each face on the original image,
 				// along with text identifing as "Human"
 				screenMat, _ := gocv.ImageToMatRGB(screenImg)
@@ -207,10 +207,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					gocv.PutText(&screenMat, "Human", pt, gocv.FontHersheyPlain, 1.2, borderColor, 2)
 				}
 
-				if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-screen-%d.jpg", currentTs, setOfFacesProcessed), screenMat) {
-					log.Printf("Successfully created image with %d faces detected\n", len(detectedFaces))
+				if gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-%d.jpg", currentTs, setOfFacesProcessed), screenImg) {
+					log.Printf("Successfully created screen-%d\n", setOfFacesProcessed)
 				} else {
-					log.Printf("Failed to create image with %d faces detected\n", len(detectedFaces))
+					log.Printf("Failed to create screen-%d\n", setOfFacesProcessed)
+				}
+				if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-screen-%d.jpg", currentTs, setOfFacesProcessed), screenMat) {
+					log.Printf("Successfully created screen-%d image with %d faces detected\n", setOfFacesProcessed, len(detectedFaces))
+				} else {
+					log.Printf("Failed to create screen-%d image with %d faces detected\n", setOfFacesProcessed, len(detectedFaces))
 				}
 			}
 		}
@@ -239,7 +244,18 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			},
 		})
 		if err != nil {
-			log.Fatalf("ERROR: Failed to search for pre-enhanced detected image - %d-%dx%d - %v", i, faceCoords.X, faceCoords.Y, err.Error())
+			log.Printf("ERROR: Failed to search for pre-enhanced detected image - %d-%dx%d - %v", i, faceCoords.X, faceCoords.Y, err.Error())
+			if debugMode {
+				logErrorMat, _ := gocv.ImageToMatRGB(screenImg)
+				defer logErrorMat.Close()
+				gocv.Rectangle(&logErrorMat, rect, color.RGBA{0, 0, 255, 0}, 3)
+				gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/search-failure-screen-%d-%dx%d.jpg", currentTs, i, faceCoords.X, faceCoords.Y), logErrorMat)
+			}
+			err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
 		}
 		matchedFace := types.FaceMatch{}
 		for _, match := range searchResult.FaceMatches {
