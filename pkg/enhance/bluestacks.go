@@ -54,7 +54,10 @@ func NewBlueStacks() *BlueStacks {
 	processName := "BlueStacks"
 	fpid, err := robotgo.FindIds(processName)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("ERROR:", err.Error())
+	}
+	if len(fpid) == 0 {
+		log.Fatal("ERROR: BlueStacks is not running.")
 	}
 	log.Println(fpid)
 	// Ensure that the main BlueStacks pid is used
