@@ -306,17 +306,49 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			continue
 		}
 
-		// 1. Click on the face to load it
+		// 1. Fetch the facedata details
+		facedata := FaceData{}
+		for _, facedataPath := range facedataPaths {
+			filename := filepath.Base(facedataPath)
+			extension := filepath.Ext(filename)
+			name := filename[0 : len(filename)-len(extension)]
+			if name == imageId {
+				// Read the file and unmarshal the data
+				file, _ := ioutil.ReadFile(facedataPath)
+				_ = json.Unmarshal([]byte(file), &facedata)
+				break
+			}
+		}
+		faceDetails := facedata.FaceDetails[0]
+
+		// 2. Ensure the character is of age
+		if (*faceDetails.AgeRange.Low) < 16 {
+			log.Printf("Character is underage - Image ID %v\n", imageId)
+			err = bluestacks.OsBackClick()
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
+		}
+
+		// 3. Click on the face to load it
 		bluestacks.MoveClick(faceCoords.X, faceCoords.Y)
 		log.Printf("[Face %d] Image ID %v selected...\n", i, imageId)
+		robotgo.MilliSleep(250)
+		editorScreenImg := robotgo.CaptureImg()
+		if debugMode {
+			go func() {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-ID-%v--editor-screen.jpg", currentTs, i, imageId), editorScreenImg)
+			}()
+		}
 
-		// 2. Wait for the face to appear
+		// 4. Wait for the face to appear
 		count := 0
 		var validRects []image.Rectangle
 		for {
 			count++
 			robotgo.MilliSleep(2000)
-			validRects = bluestacks.DetectFaces(screenImg, 100)
+			validRects = bluestacks.DetectFaces(editorScreenImg, 300)
 			if len(validRects) > 0 || count > 10 {
 				break
 			}
@@ -333,43 +365,65 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 		log.Printf("[Face %d] Starting enhancement for Image ID %v ...\n", i, imageId)
 
-		// 3. Run the enhancement process here.
-
-		// 3.1. Determine the enhancements
-		// -- 3.1.1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
-		// -- 3.1.2. Check if user has glasses -- add glasses -- random selection
-		// -- 3.1.3. Check if female, and probability for make up -- add make up -- random selection
-		// -- 3.1.4. Plus size the person by chance too -- there should be heavier people.
-		// 3.2. Iterate and apply the enhancements
-		// -- 3.2.1. Select enhancement
-		// -- 3.2.2. Wait for the processing text to no longer show
-		// -- 3.2.3. Select the Apply text
-		// -- 3.2.4. Select the Save text
-		// -- 3.2.5. Detect the image inside of the Save Screen
-		// -- 3.2.6. Click the back button -- to get back to the Editor
-
-		facedata := FaceData{}
-		for _, facedataPath := range facedataPaths {
-			filename := filepath.Base(facedataPath)
-			extension := filepath.Ext(filename)
-			name := filename[0 : len(filename)-len(extension)]
-			if name == imageId {
-				// Read the file and unmarshal the data
-				file, _ := ioutil.ReadFile(facedataPath)
-				_ = json.Unmarshal([]byte(file), &facedata)
-				break
-			}
-		}
-
-		faceDetails := facedata.FaceDetails[0]
-		if (*faceDetails.AgeRange.Low) < 16 {
-			log.Printf("Character is underage - Image ID %v\n", imageId)
-			err = bluestacks.OsBackClick()
+		// Ensure that the Female Gender Controls are Activated
+		genderSwitchIconCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+			imagePath := "./assets/faceapp/editor-header.png"
+			editorHeaderImg, _, err := robotgo.DecodeImg(imagePath)
 			if err != nil {
-				log.Fatal("ERROR: ", err.Error())
+				return Coords{}, fmt.Errorf("%v: %s", err, imagePath)
 			}
+			gsImagePath := "./assets/faceapp/gender-switch-icon.png"
+			genderSwitchIconImg, _, err := robotgo.DecodeImg(gsImagePath)
+			if err != nil {
+				return Coords{}, fmt.Errorf("%v: %s", err, gsImagePath)
+			}
+			coords, err := bluestacks.GetImageCoordsInImage(editorHeaderImg, editorScreenImg)
+			if err != nil {
+				return Coords{}, fmt.Errorf("%v: %s", err, imagePath)
+			}
+			xLandmark := float64(coords.X) / float64(bluestacks.ScreenWidth)
+			xPointInImage := xLandmark * float64(editorScreenImg.Bounds().Dx())
+			genderSwitchXPointInImage := xPointInImage + float64(editorHeaderImg.Bounds().Dx())/2.0 - float64(genderSwitchIconImg.Bounds().Dx())/2.0
+			genderSwitchXLandmark := genderSwitchXPointInImage / float64(editorScreenImg.Bounds().Dx())
+			genderSwitchXCoord := int(math.Round(genderSwitchXLandmark * float64(bluestacks.ScreenWidth)))
+			return Coords{
+				X: genderSwitchXCoord,
+				Y: coords.Y,
+			}, err
+		}, "editor-gender-switch-icon")
+		if err != nil {
+			log.Printf("ERROR: Cannot select gender switch icon - %v\n", err.Error())
 			continue
 		}
+		q.Q("Gender Switch Icon Coords: ", genderSwitchIconCoords)
+		bluestacks.MoveClick(genderSwitchIconCoords.X, genderSwitchIconCoords.Y)
+		robotgo.MilliSleep(250)
+		editorScreenImg = robotgo.CaptureImg()
+		genderSwitchOptionCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+			return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gender-switch-female-option.png", editorScreenImg)
+		}, "editor-gender-switch-option")
+		if err != nil {
+			log.Printf("ERROR: Cannot select gender switch option - %v\n", err.Error())
+			continue
+		}
+		q.Q("Gender Switch Icon Coords: ", genderSwitchOptionCoords)
+		bluestacks.MoveClick(genderSwitchOptionCoords.X, genderSwitchOptionCoords.Y)
+		robotgo.MilliSleep(250)
+
+		// 5. Run the enhancement process here.
+
+		// 5.1. Determine the enhancements
+		// -- 5.1.1. Check if user has beard -- add beard. -- random selection of beard type depending on if mustache/beard
+		// -- 5.1.2. Check if user has glasses -- add glasses -- random selection
+		// -- 5.1.3. Check if female, and probability for make up -- add make up -- random selection
+		// -- 5.1.4. Plus size the person by chance too -- there should be heavier people.
+		// 5.2. Iterate and apply the enhancements
+		// -- 5.2.1. Select enhancement
+		// -- 5.2.2. Wait for the processing text to no longer show
+		// -- 5.2.3. Select the Apply text
+		// -- 5.2.4. Select the Save text
+		// -- 5.2.5. Detect the image inside of the Save Screen
+		// -- 5.2.6. Click the back button -- to get back to the Editor
 
 		enhancementsApplied := []map[string]string{}
 		for _, enhancement := range enhancements {
@@ -409,8 +463,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 
 			// proceed with enhancement
-			log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
 			editorScreenImg := robotgo.CaptureImg()
+			log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
 			eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
 			}, fmt.Sprintf("enhancement-%s", enhancement.Name))
