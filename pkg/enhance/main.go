@@ -146,9 +146,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	var screenImg image.Image
 	i := -1                  // Iterates for each face that is processed... not just an iteration for each set of faces
 	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
-	// var lastScrollYCoord int
-	var lastScrollY int
+	var lastScrollY int      // TODO: We actually need an array of integers... otherwise, we're scrolling in old locations using a newly deduced scroll Y coord
 	for {
+		q.Q("Started of loop:", detectedFaces)
 		if maxIterations > 0 {
 			if setOfFacesProcessed > maxIterations-1 {
 				break
@@ -159,28 +159,20 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		i++
 
 		// For each iteration -- return the gallery... this way we can proceed with the next face directly from the gallery, and can scroll within the gallery.
-		// err = bluestacks.MoveToSharedFolderFromHome()
-		// if err != nil {
-		// 	log.Fatal("ERROR: ", err.Error())
-		// }
+		err = bluestacks.MoveToSharedFolderFromHome()
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
 		// We'll need to scroll to these images for each iteration -- ie. each time the gallery is reached, the scroll from the top is executed.
 		// If we cannot scroll anymore, break the loop
 		theEnd := false
 		for s := 0; s < setOfFacesProcessed; s++ {
 			// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
 			preImg := robotgo.CaptureImg()
-			// for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
 			robotgo.Move(bluestacks.CenterCoords.X, lastScrollY)
-			// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230, 1.0, 1.0)
+			robotgo.MilliSleep(250)
 			robotgo.DragSmooth(bluestacks.CenterCoords.X, 0)
-			// robotgo.MouseToggle("down")
-			// robotgo.MoveSmooth(bluestacks.CenterCoords.X, 0)
-			// robotgo.MoveSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-100)
-			// robotgo.MouseToggle("up")
-			// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-185, 3.0, 5.0)
-			// robotgo.MilliSleep(500)
-			// }
-			robotgo.MilliSleep(500)
+			robotgo.MilliSleep(250)
 			postImg := robotgo.CaptureImg()
 			if imagesSimilar(preImg, postImg) {
 				// If after scrolling, the screen is the same, the break... -- this means that there are no more images to scroll
@@ -193,9 +185,24 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		}
 
 		// Detect or iterate over the next face
+		q.Q("Before Check:", detectedFaces)
 		if len(detectedFaces) == 0 {
 			screenImg = robotgo.CaptureImg()
-			detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
+			// detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
+			detectedFaces = []image.Rectangle{
+				{
+					Min: image.Point{X: 2315, Y: 605},
+					Max: image.Point{X: 3170, Y: 1460},
+				},
+				{
+					Min: image.Point{X: 390, Y: 616},
+					Max: image.Point{X: 1277, Y: 1503},
+				},
+				{
+					Min: image.Point{X: 1411, Y: 642},
+					Max: image.Point{X: 2174, Y: 1405},
+				},
+			}
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), setOfFacesProcessed)
 			var scrollRect image.Rectangle
 			for _, rect := range detectedFaces {
@@ -234,16 +241,21 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 		}
 
-		rect, detectedFaces := detectedFaces[0], detectedFaces[1:]
+		// rect, detectedFaces := detectedFaces[0], detectedFaces[1:]
 
-		//! TEST -- Scrolling
-		detectedFaces = []image.Rectangle{}
+		//! TEST -- Scrolling -- Splitting out the rect and detectedFaces assignment here works
+		rect := detectedFaces[0]
+		detectedFaces = nil
+		q.Q(len(detectedFaces))
+		q.Q("After Check:", detectedFaces)
 		setOfFacesProcessed++
-		// err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
-		// if err != nil {
-		// 	log.Fatal("ERROR: ", err.Error())
-		// }
+		err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
 		continue
+
+		q.Q(detectedFaces)
 
 		if len(detectedFaces) == 0 {
 			// The set of faces process -- should index after we've emptied the detected faces for processing.
