@@ -146,6 +146,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	var screenImg image.Image
 	i := -1                  // Iterates for each face that is processed... not just an iteration for each set of faces
 	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
+	// var lastScrollYCoord int
+	var lastScrollY int
 	for {
 		if maxIterations > 0 {
 			if setOfFacesProcessed > maxIterations-1 {
@@ -167,16 +169,17 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		for s := 0; s < setOfFacesProcessed; s++ {
 			// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
 			preImg := robotgo.CaptureImg()
-			for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
-				robotgo.Move(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y)
-				// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230, 1.0, 1.0)
-				// robotgo.MouseToggle("down")
-				// robotgo.MoveSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230)
-				// robotgo.MilliSleep(500)
-				// robotgo.MouseToggle("up")
-				robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-185, 3.0, 5.0)
-				// robotgo.MilliSleep(500)
-			}
+			// for miniS := 0; miniS < 2; miniS++ { // Perform miniscrolls inside of 1 scroll
+			robotgo.Move(bluestacks.CenterCoords.X, lastScrollY)
+			// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-230, 1.0, 1.0)
+			robotgo.DragSmooth(bluestacks.CenterCoords.X, 0)
+			// robotgo.MouseToggle("down")
+			// robotgo.MoveSmooth(bluestacks.CenterCoords.X, 0)
+			// robotgo.MoveSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-100)
+			// robotgo.MouseToggle("up")
+			// robotgo.DragSmooth(bluestacks.CenterCoords.X, bluestacks.CenterCoords.Y-185, 3.0, 5.0)
+			// robotgo.MilliSleep(500)
+			// }
 			robotgo.MilliSleep(500)
 			postImg := robotgo.CaptureImg()
 			if imagesSimilar(preImg, postImg) {
@@ -194,12 +197,18 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			screenImg = robotgo.CaptureImg()
 			detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), setOfFacesProcessed)
+			var scrollRect image.Rectangle
+			for _, rect := range detectedFaces {
+				if scrollRect.Max.Y == 0 || scrollRect.Max.Y > rect.Max.Y {
+					scrollRect = rect
+				}
+			}
+			scrollYMaxLandmark := (float64(scrollRect.Max.Y) - float64(scrollRect.Dy()/8)) / float64(screenImg.Bounds().Dy())
+			lastScrollY = int(math.Round(scrollYMaxLandmark * float64(bluestacks.ScreenHeight)))
+
 			if debugMode {
 				// color for the rect when faces detected
 				borderColor := color.RGBA{0, 0, 255, 0}
-				// if setOfFacesProcessed%2 == 0 {
-				// 	borderColor = color.RGBA{255, 0, 0, 0}
-				// }
 				// draw a rectangle around each face on the original image,
 				// along with text identifing as "Human"
 				screenMat, _ := gocv.ImageToMatRGB(screenImg)
@@ -213,9 +222,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 
 				if gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-%d.jpg", currentTs, setOfFacesProcessed), screenImg) {
-					log.Printf("Successfully created screen-%d\n", setOfFacesProcessed)
+					log.Printf("Successfully created screen-%d image\n", setOfFacesProcessed)
 				} else {
-					log.Printf("Failed to create screen-%d\n", setOfFacesProcessed)
+					log.Printf("Failed to create screen-%d image\n", setOfFacesProcessed)
 				}
 				if gocv.IMWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-detect-screen-%d.jpg", currentTs, setOfFacesProcessed), screenMat) {
 					log.Printf("Successfully created screen-%d image with %d faces detected\n", setOfFacesProcessed, len(detectedFaces))
@@ -225,8 +234,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 		}
 
-		var rect image.Rectangle
-		rect, detectedFaces = detectedFaces[0], detectedFaces[1:]
+		rect, detectedFaces := detectedFaces[0], detectedFaces[1:]
 
 		//! TEST -- Scrolling
 		detectedFaces = []image.Rectangle{}
