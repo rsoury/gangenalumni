@@ -148,7 +148,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
 	var scrollY []int        // An array of integers. To scroll in old locations using a newly deduced scroll Y coord
 	for {
-		q.Q("Started of loop:", detectedFaces)
 		if maxIterations > 0 {
 			if setOfFacesProcessed > maxIterations-1 {
 				break
@@ -185,7 +184,6 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		}
 
 		// Detect or iterate over the next face
-		q.Q("Before Check:", detectedFaces)
 		if len(detectedFaces) == 0 {
 			screenImg = robotgo.CaptureImg()
 			detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
@@ -228,21 +226,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			}
 		}
 
-		// rect, detectedFaces := detectedFaces[0], detectedFaces[1:]
-
-		//! TEST -- Scrolling -- Splitting out the rect and detectedFaces assignment here works
 		rect := detectedFaces[0]
-		detectedFaces = nil
-		q.Q(len(detectedFaces))
-		q.Q("After Check:", detectedFaces)
-		setOfFacesProcessed++
-		err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
-		if err != nil {
-			log.Fatal("ERROR: ", err.Error())
-		}
-		continue
-
-		q.Q(detectedFaces)
+		detectedFaces = detectedFaces[1:]
 
 		if len(detectedFaces) == 0 {
 			// The set of faces process -- should index after we've emptied the detected faces for processing.
