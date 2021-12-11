@@ -146,7 +146,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	var screenImg image.Image
 	i := -1                  // Iterates for each face that is processed... not just an iteration for each set of faces
 	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
-	var lastScrollY int      // TODO: We actually need an array of integers... otherwise, we're scrolling in old locations using a newly deduced scroll Y coord
+	var scrollY []int        // An array of integers. To scroll in old locations using a newly deduced scroll Y coord
 	for {
 		q.Q("Started of loop:", detectedFaces)
 		if maxIterations > 0 {
@@ -169,7 +169,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		for s := 0; s < setOfFacesProcessed; s++ {
 			// For each scroll induced by the iteration, compare the pre/post images. If we've iterated beyond the point of scrolling, then break.
 			preImg := robotgo.CaptureImg()
-			robotgo.Move(bluestacks.CenterCoords.X, lastScrollY)
+			robotgo.Move(bluestacks.CenterCoords.X, scrollY[s]) // Use the scroll position of the set of faces detected at that point.
 			robotgo.MilliSleep(250)
 			robotgo.DragSmooth(bluestacks.CenterCoords.X, 0)
 			robotgo.MilliSleep(250)
@@ -188,21 +188,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		q.Q("Before Check:", detectedFaces)
 		if len(detectedFaces) == 0 {
 			screenImg = robotgo.CaptureImg()
-			// detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
-			detectedFaces = []image.Rectangle{
-				{
-					Min: image.Point{X: 2315, Y: 605},
-					Max: image.Point{X: 3170, Y: 1460},
-				},
-				{
-					Min: image.Point{X: 390, Y: 616},
-					Max: image.Point{X: 1277, Y: 1503},
-				},
-				{
-					Min: image.Point{X: 1411, Y: 642},
-					Max: image.Point{X: 2174, Y: 1405},
-				},
-			}
+			detectedFaces = bluestacks.DetectFaces(screenImg, 300) // increase validity to prevent face detection in hair...
 			log.Printf("Found %d faces in screen %d\n", len(detectedFaces), setOfFacesProcessed)
 			var scrollRect image.Rectangle
 			for _, rect := range detectedFaces {
@@ -211,7 +197,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				}
 			}
 			scrollYMaxLandmark := (float64(scrollRect.Max.Y) - float64(scrollRect.Dy()/8)) / float64(screenImg.Bounds().Dy())
-			lastScrollY = int(math.Round(scrollYMaxLandmark * float64(bluestacks.ScreenHeight)))
+			lastScrollY := int(math.Round(scrollYMaxLandmark * float64(bluestacks.ScreenHeight)))
+			scrollY = append(scrollY, lastScrollY)
 
 			if debugMode {
 				// color for the rect when faces detected
