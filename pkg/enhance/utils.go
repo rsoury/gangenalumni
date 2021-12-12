@@ -23,7 +23,8 @@ func ImageToBytes(img image.Image) ([]byte, error) {
 }
 
 func getCollectionId(sourceDir string) string {
-	return "npcc-2-" + filepath.Base(strings.TrimSuffix(sourceDir, "/"))
+	basename := filepath.Base(strings.TrimSuffix(sourceDir, "/"))
+	return "npcc-2-" + basename
 }
 
 func grayscaleImage(img image.Image) (image.Image, error) {

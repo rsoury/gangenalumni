@@ -275,8 +275,13 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				matchedFace = match
 			}
 		}
-		if *matchedFace.Similarity == 0 {
-			log.Fatalf("ERROR: No face matched for pre-enhanced detected image - %d-%dx%d - %v", i, faceCoords.X, faceCoords.Y, err.Error())
+		if matchedFace.Similarity == nil {
+			log.Printf("ERROR: No face matched for pre-enhanced detected image - %d-%dx%d\n", i, faceCoords.X, faceCoords.Y)
+			err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
+			if err != nil {
+				log.Fatal("ERROR: ", err.Error())
+			}
+			continue
 		}
 
 		// Now that we have the matched face, we can produce the enhancement, then detect the enhanced face to save against the matched image id.
@@ -631,10 +636,15 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Printf("[Face %d] Image ID %v - Saved\n", i, imageId)
 			faceRect := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
 			// Cache the post-save face detection. This way we can fallback in the case the face detected is not at center of the screen, or if there are no faces detected.
-			if len(faceRect) == 0 {
-				log.Printf("WARN: Cannot find Detected Enhanced Face - with index: %d\n", i)
+			if len(faceRect) != 1 {
+				if len(faceRect) > 1 {
+					// This was being hit due to the images inside of then Before & After image.
+					log.Printf("WARN: [Face %v] Detected multiple faces after enhancement - with index: %d\n", imageId, i)
+				} else if len(faceRect) == 0 {
+					log.Printf("WARN: [Face %v] Cannot find Detected Enhanced Face - with index: %d\n", imageId, i)
+				}
 				if len(detectedEnhancedFaces) == 0 {
-					log.Printf("ERROR: No cached Detected Enhanced Face Coordinates to use - with index: %d\n", i)
+					log.Printf("ERROR: [Face %v] No cached Detected Enhanced Face Coordinates to use - with index: %d\n", imageId, i)
 					// Use the back button to return to the Home Screen -- Exit the Save Screen and then Editor Screen
 					_ = bluestacks.OsBackClick()
 					err = bluestacks.OsBackClick()
@@ -642,6 +652,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 						log.Fatal("ERROR: ", err.Error())
 					}
 				} else {
+					log.Printf("[Face %v] Using average cached Detected Enhanced Face Coordinates - with index: %d\n", imageId, i)
 					// Determine total rect from previously detected post-save faces
 					var totalRect image.Rectangle
 					for _, r := range detectedEnhancedFaces {
@@ -661,15 +672,10 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					}
 				}
 			} else {
-				// Face rect surrounds the center of the screen
 				detectedEnhancedFaces = append(detectedEnhancedFaces, faceRect[0])
 			}
-			if len(faceRect) > 1 {
-				// This was being hit due to the images inside of then Before & After image.
-				log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
-			}
 			// Save detected enhanced face to output directory
-			enhancedFaceImg := imaging.Crop(postSaveImg, detectedEnhancedFaces[0])
+			enhancedFaceImg := imaging.Crop(postSaveImg, faceRect[0])
 			enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
 			go func() {
 				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
