@@ -13,7 +13,7 @@ const sharp = require("sharp");
 const Queue = require("better-queue");
 const debugLog = require("debug")("avatar-modulate");
 
-const options = require("../options")();
+const options = require("../utils/options")();
 
 const { input, s3 } = options;
 

@@ -24,7 +24,7 @@ const Queue = require("better-queue");
 const chokidar = require("chokidar");
 const debugLog = require("debug")("avatar-filter");
 
-const options = require("../options")();
+const options = require("../utils/options")();
 const { delay } = require("../utils");
 
 const { input, s3 } = options;
@@ -65,7 +65,7 @@ if (!s3) {
 		// For each image
 		// 1. Set a OBS scene image source file.
 		// 2. Execute Snap Camera using Golang and RobotGO
-		// 3. Resize the image programmatically to remove the excess background and produce a 720 ×720 -- https://github.com/lovell/sharp
+		// 3. Resize the image programmatically to remove the excess background and produce a 720x720 -- https://github.com/lovell/sharp
 
 		const obs = new OBSWebSocket();
 		await obs.connect({ password: "x5Wh98fTfUauQ9Ms" });

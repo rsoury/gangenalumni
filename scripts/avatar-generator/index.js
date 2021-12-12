@@ -16,7 +16,7 @@ const ono = require("ono");
 const mkdirp = require("mkdirp");
 const debugLog = require("debug")("avatar-generate");
 
-const options = require("../options")();
+const options = require("../utils/options")();
 
 const { number, s3 } = options;
 

@@ -1,10 +1,7 @@
 /**
- * Step 3
+ * Data Step 1 -- After Step 1 of generating Avatars.
  *
- * Process the Filtered Avatars through AI Illustration Refinement/Filter/Painting-processor
- *
- * We're going to need to use a Google Trigger to read the Prisma Auth Email and then Forward to a nGrok Tunnel
- * Or use a Google API -- https://developers.google.com/gmail/api/quickstart/nodejs
+ * Collect AI based data on each of the images in Step 1.
  */
 
 require("dotenv").config();
@@ -16,8 +13,8 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
-const Queue = require("./queue");
-const options = require("./options")((program) => {
+const Queue = require("./utils/queue");
+const options = require("./utils/options")((program) => {
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."

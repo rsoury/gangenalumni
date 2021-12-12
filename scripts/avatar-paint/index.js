@@ -21,7 +21,7 @@ const del = require("del");
 const util = require("util");
 const ncp = util.promisify(require("ncp"));
 
-const options = require("../options")((program) => {
+const options = require("../utils/options")((program) => {
 	program.option(
 		"-w, --with-ui",
 		"Option to show the browser during automation. Browser will run headlessly by default."

@@ -18,8 +18,8 @@ const sizeOf = require("image-size");
 const { createCanvas, loadImage } = require("canvas");
 const colorDifference = require("color-difference");
 
-const Queue = require("../queue");
-const options = require("../options")((program) => {
+const Queue = require("../utils/queue");
+const options = require("../utils/options")((program) => {
 	program.option(
 		"--all-options",
 		"Flag to remove the probability/chance checks."
