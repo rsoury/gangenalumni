@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strings"
 	"time"
 
@@ -49,8 +48,6 @@ func PrepareGlassesDirectory(cmd *cli.Command, args []string) {
 	limit, _ := cmd.Flags().GetInt("limit")
 
 	log.Println("Start preparing of images for glasses enhancement...")
-
-	q.Q(sourceDirs)
 
 	sourceBasename := filepath.Base(strings.TrimSuffix(sourceDirs[0], "/"))
 	outputDir := path.Join(outputParentDir, fmt.Sprintf("%s-for-glasses", sourceBasename))
@@ -122,7 +119,6 @@ func PrepareGlassesDirectory(cmd *cli.Command, args []string) {
 		}
 	}
 
-	q.Q(len(processed))
 	var imageIndex []IndexedImage
 	imageFileExtensions := []string{"jpeg", "jpg", "png"}
 	for _, f := range processed {
@@ -131,7 +127,6 @@ func PrepareGlassesDirectory(cmd *cli.Command, args []string) {
 		for _, sourceDir := range sourceDirs { // Source directory order takes priority
 			for _, fileExt := range imageFileExtensions {
 				proposedFilePath := path.Join(sourceDir, fmt.Sprintf("/%s.%s", f.Id, fileExt))
-				q.Q(proposedFilePath)
 				if _, err := os.Stat(proposedFilePath); err == nil {
 					imgPath = proposedFilePath
 					imgExt = fileExt
