@@ -124,7 +124,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	// Setup AWS -- https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/rekognition
 	ctx := context.Background()
 	awsConfig := NewAWSEnvConfig()
-	// q.Q(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"))
+	// if debugMode {q.Q(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"))}
 	awsNativeConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsConfig.Region))
 	if err != nil {
 		log.Fatalf("ERROR: Cannot load AWS config %v\n", err.Error())
@@ -143,6 +143,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
 	var detectedFaces []image.Rectangle
+	var detectedEnhancedFaces []image.Rectangle // Cache of faces saved in post-save screen
 	var screenImg image.Image
 	i := -1                  // Iterates for each face that is processed... not just an iteration for each set of faces
 	setOfFacesProcessed := 0 // Iterates for each set of detected faces in gallery
@@ -408,7 +409,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Printf("ERROR: Cannot select gender switch icon - %v\n", err.Error())
 			continue
 		}
-		q.Q("Gender Switch Icon Coords: ", genderSwitchIconCoords)
+		if debugMode {
+			q.Q("Gender Switch Icon Coords: ", genderSwitchIconCoords)
+		}
 		bluestacks.MoveClick(genderSwitchIconCoords.X, genderSwitchIconCoords.Y)
 		robotgo.MilliSleep(250)
 		editorScreenImg = robotgo.CaptureImg()
@@ -419,7 +422,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Printf("ERROR: Cannot select gender switch option - %v\n", err.Error())
 			continue
 		}
-		q.Q("Gender Switch Icon Coords: ", genderSwitchOptionCoords)
+		if debugMode {
+			q.Q("Gender Switch Icon Coords: ", genderSwitchOptionCoords)
+		}
 		bluestacks.MoveClick(genderSwitchOptionCoords.X, genderSwitchOptionCoords.Y)
 		robotgo.MilliSleep(250)
 
@@ -450,6 +455,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			if enhancement.Name == "Beards" {
 				if faceDetails.Beard.Value {
 					applyEnhancement = true
+					for _, t := range enhancement.Types {
+						if t.Name == "Full beard" {
+							eType = t
+						}
+					}
 				}
 			}
 			if !applyEnhancement {
@@ -485,7 +495,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
 				continue
 			}
-			q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
+			if debugMode {
+				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
+			}
 			bluestacks.MoveClick(eCoords.X, eCoords.Y)
 			robotgo.MilliSleep(1000)
 			log.Printf("Image ID %v - Entered into enhancement %s\n", imageId, enhancement.Name)
@@ -504,7 +516,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
 				}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
-				q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
+				if debugMode {
+					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
+				}
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
 					err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
@@ -534,7 +548,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
 			}, fmt.Sprintf("enhancement-type-%s", eType.Name))
-			q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
+			if debugMode {
+				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
+			}
 			if err != nil {
 				log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
 				err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
@@ -556,7 +572,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
 				continue
 			}
-			q.Q("Apply Coords: ", applyCoords)
+			if debugMode {
+				q.Q("Apply Coords: ", applyCoords)
+			}
 			bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
 			robotgo.Click()          // Double click to make sure....
 			robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
@@ -578,7 +596,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())
 				continue
 			}
-			q.Q("Save Coords: ", saveCoords)
+			if debugMode {
+				q.Q("Save Coords: ", saveCoords)
+			}
 			saveCount := 0
 			isSaved := false
 			var postSaveImg image.Image
@@ -609,12 +629,42 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				continue
 			}
 			log.Printf("[Face %d] Image ID %v - Saved\n", i, imageId)
-			detectedEnhancedFaces := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
-			if len(detectedEnhancedFaces) == 0 {
-				log.Printf("ERROR: Cannot find Detected Enhanced Face - with index: %d\n", i)
-				continue
+			faceRect := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
+			// Cache the post-save face detection. This way we can fallback in the case the face detected is not at center of the screen, or if there are no faces detected.
+			if len(faceRect) == 0 {
+				log.Printf("WARN: Cannot find Detected Enhanced Face - with index: %d\n", i)
+				if len(detectedEnhancedFaces) == 0 {
+					log.Printf("ERROR: No cached Detected Enhanced Face Coordinates to use - with index: %d\n", i)
+					// Use the back button to return to the Home Screen -- Exit the Save Screen and then Editor Screen
+					_ = bluestacks.OsBackClick()
+					err = bluestacks.OsBackClick()
+					if err != nil {
+						log.Fatal("ERROR: ", err.Error())
+					}
+				} else {
+					// Determine total rect from previously detected post-save faces
+					var totalRect image.Rectangle
+					for _, r := range detectedEnhancedFaces {
+						totalRect = image.Rectangle{
+							Min: image.Point{
+								X: r.Min.X + totalRect.Min.X,
+								Y: r.Min.Y + totalRect.Min.Y,
+							},
+							Max: image.Point{
+								X: r.Max.X + totalRect.Max.X,
+								Y: r.Max.Y + totalRect.Max.Y,
+							},
+						}
+					}
+					faceRect = []image.Rectangle{
+						image.Rect(totalRect.Min.X/len(detectedEnhancedFaces), totalRect.Min.Y/len(detectedEnhancedFaces), totalRect.Max.X/len(detectedEnhancedFaces), totalRect.Max.Y/len(detectedEnhancedFaces)),
+					}
+				}
+			} else {
+				// Face rect surrounds the center of the screen
+				detectedEnhancedFaces = append(detectedEnhancedFaces, faceRect[0])
 			}
-			if len(detectedEnhancedFaces) > 1 {
+			if len(faceRect) > 1 {
 				// This was being hit due to the images inside of then Before & After image.
 				log.Printf("WARN: Detected multiple faced after enhancement - with index: %d\n", i)
 			}
