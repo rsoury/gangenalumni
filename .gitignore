@@ -26,3 +26,9 @@ build
 bin
 data/aws/*
 !data/aws/.gitkeep
+data/face/*
+!data/face/.gitkeep
+data/ethnicity/*
+!data/ethnicity/.gitkeep
+data/name/*
+!data/name/.gitkeep

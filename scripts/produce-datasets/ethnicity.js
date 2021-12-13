@@ -1,20 +1,21 @@
 /**
- * Data Step 1 -- After Step 1 of generating Avatars.
+ * Data Step 2 -- After production of Face Dectection Datasets -- produce-datasets/face.js
  *
- * Collect AI based data on each of the images in Step 1.
+ * Collect AI based Ethnicity Prediction data on each of the images in Step 1.
+ * Uses the Clarifai Demographics AI Model
  */
 
 require("dotenv").config();
 const path = require("path");
-const { Rekognition } = require("aws-sdk");
 const fs = require("fs").promises;
 const chalk = require("chalk");
 const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
-const Queue = require("./utils/queue");
-const options = require("./utils/options")((program) => {
+const { ClarifaiStub, grpc } = require("clarifai-nodejs-grpc");
+const Queue = require("../utils/queue");
+const options = require("../utils/options")((program) => {
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."
@@ -24,12 +25,13 @@ const options = require("./utils/options")((program) => {
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
 	);
 });
-const { inspectObject } = require("./utils");
+const { inspectObject } = require("../utils");
 
 const { input, output: outputDir, overwrite } = options;
 
-// Unique Id for Folder to store files in...
-// const currentTs = Date.now();
+const stub = ClarifaiStub.grpc();
+const metadata = new grpc.Metadata();
+metadata.set("authorization", "Key 014022e6a9d54677acfe9731114ee1e3");
 
 debugLog(`Output Directory: ${outputDir}`);
 
@@ -37,10 +39,6 @@ let sourceImages = [];
 
 // Create dir
 mkdirp.sync(outputDir);
-
-const rekognition = new Rekognition({
-	region: process.env.AWS_REGION || "us-east-1"
-});
 
 (async () => {
 	const stat = await fs.lstat(input);
@@ -68,14 +66,46 @@ const rekognition = new Rekognition({
 			}
 
 			const fileBuffer = await fs.readFile(image);
-			const result = await rekognition
-				.detectFaces({
-					Image: { Bytes: fileBuffer },
-					Attributes: ["ALL"]
-				})
-				.promise();
+			const fileBase64 = Buffer.from(fileBuffer).toString("base64");
+			const result = await new Promise((resolve, reject) => {
+				stub.PostModelOutputs(
+					{
+						// This is the model ID of a publicly available General model. You may use any other public or custom model ID.
+						model_id: "93c277ec3940fba661491fda4d3ccfa0", // appearance-multicultural -- pre-trained model
+						inputs: [
+							{
+								data: {
+									image: { base64: fileBase64 }
+								}
+							}
+						]
+					},
+					metadata,
+					(err, response) => {
+						if (err) {
+							return reject(err);
+						}
 
-			await jsonfile.writeFile(outputFile, result);
+						if (response.status.code !== 10000) {
+							debugLog(
+								"Received failed status: " +
+									response.status.description +
+									"\n" +
+									response.status.details
+							);
+							return reject(new Error(response.status.description));
+						}
+
+						debugLog("Predicted concepts, with confidence values:");
+						response.outputs[0].data.concepts.forEach((c) => {
+							debugLog(c.name + ": " + c.value);
+						});
+						return resolve(response.outputs[0]);
+					}
+				);
+			});
+
+			await jsonfile.writeFile(outputFile, result.data.concepts);
 
 			return { image, output: outputFile };
 		},
@@ -86,9 +116,7 @@ const rekognition = new Rekognition({
 	);
 
 	// Queue the images for filtering.
-	console.log(
-		chalk.yellow(`Processing facial analysis using AWS Rekognition...`)
-	);
+	console.log(chalk.yellow(`Processing ethnicity analysis of input images...`));
 	sourceImages.forEach((image, i) => {
 		q.push({ image, i });
 	});
@@ -99,7 +127,10 @@ const rekognition = new Rekognition({
 	});
 
 	q.on("task_finish", (taskId, result) => {
-		console.log(chalk.green(`[${taskId}] Successfully painted image`), result);
+		console.log(
+			chalk.green(`[${taskId}] Successfully processed image`),
+			result
+		);
 	});
 
 	await new Promise((resolve) => {

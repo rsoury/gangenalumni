@@ -7,7 +7,9 @@
 	"license": "UNLICENSED",
 	"private": true,
 	"scripts": {
-		"datasets": "node ./scripts/produce-datasets",
+		"name-datasets": "node ./scripts/produce-datasets/name",
+		"ethnicity-datasets": "node ./scripts/produce-datasets/ethnicity",
+		"face-datasets": "node ./scripts/produce-datasets/face",
 		"enhance": "./bin/enhance",
 		"accessorise": "node ./scripts/avatar-accessorise",
 		"modulate": "node ./scripts/avatar-modulate",
@@ -47,6 +49,7 @@
 		"cheerio": "^1.0.0-rc.10",
 		"child-process-promise": "^2.2.1",
 		"chokidar": "^3.5.2",
+		"clarifai-nodejs-grpc": "^7.11.0",
 		"color-difference": "^0.3.4",
 		"commander": "^8.3.0",
 		"debug": "^4.3.2",
