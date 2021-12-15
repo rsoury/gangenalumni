@@ -5490,6 +5490,11 @@ https-proxy-agent@5.0.0, https-proxy-agent@^5.0.0:
     agent-base "6"
     debug "4"
 
+humanparser@^2.6.0:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/humanparser/-/humanparser-2.6.0.tgz#716ab4e24700ac27374577135e19edae79c8fc6f"
+  integrity sha512-zl7UM7dY/KKe4wlJ6h5fDumzVOCt5SVzPBtMf46r+eyAcjs2ucjGk/lFNT2dy+ZgTh8/hsZMwN2Wjb2Kjfgkgw==
+
 iconv-lite@0.4.24, iconv-lite@^0.4.24:
   version "0.4.24"
   resolved "https://registry.yarnpkg.com/iconv-lite/-/iconv-lite-0.4.24.tgz#2022b4b25fbddc21d2f524974a474aafe733908b"

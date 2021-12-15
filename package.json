@@ -59,6 +59,7 @@
 		"glob": "^7.2.0",
 		"glob-promise": "^4.2.2",
 		"googleapis": "^89.0.0",
+		"humanparser": "^2.6.0",
 		"image-size": "^1.0.0",
 		"interval-promise": "^1.4.0",
 		"is-numeric": "^0.0.9",

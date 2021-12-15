@@ -13,8 +13,15 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
+const axios = require("axios");
+const axiosRetry = require("axios-retry");
+const human = require("humanparser");
+const _ = require("lodash");
+
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
+	program.option("-e, --ethnicity-data <value>", "Path to ethnicity dataset.");
+	program.option("-f, --face-data <value>", "Path to face dataset.");
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."
@@ -26,7 +33,31 @@ const options = require("../utils/options")((program) => {
 });
 const { inspectObject } = require("../utils");
 
-const { input, output: outputDir, overwrite } = options;
+const { OPENAI_API_KEY } = process.env;
+
+if (!OPENAI_API_KEY) {
+	throw new Error("OpenAI API Key is required to execute this Script");
+}
+
+const request = axios.create({
+	baseURL: "https://api.openai.com/v1",
+	timeout: 30000,
+	headers: {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${OPENAI_API_KEY}`
+	}
+});
+
+axiosRetry(request, {
+	retries: 3
+});
+
+const {
+	faceData: faceDataInput,
+	ethnicityData: ethnicityDataInput,
+	output: outputDir,
+	overwrite
+} = options;
 
 // Unique Id for Folder to store files in...
 // const currentTs = Date.now();
@@ -39,48 +70,93 @@ let sources = [];
 mkdirp.sync(outputDir);
 
 (async () => {
-	const stat = await fs.lstat(input);
-	if (stat.isFile()) {
-		// Use file as image
-		sources.push(path.resolve(input));
-	} else {
-		// Get images from directory
-		sources = await glob(`${input}/*.json`, {
-			absolute: true
+	// Get images from directory
+	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
+		absolute: true
+	});
+	const ethnDataSources = await glob(`${ethnicityDataInput}/*.json`, {
+		absolute: true
+	});
+
+	sources = faceDataSources.map((filepath) => {
+		const fdName = path.basename(filepath).split(".").slice(0, -1).join(".");
+		const ethnFilepath = ethnDataSources.find((fp) => {
+			const edName = path.basename(fp).split(".").slice(0, -1).join(".");
+			return fdName === edName;
 		});
-	}
+
+		return {
+			name: fdName,
+			face: filepath,
+			ethnicity: ethnFilepath
+		};
+	});
 
 	const q = new Queue(
-		async ({ file }) => {
-			const name = path.basename(file).split(".").slice(0, -1).join(".");
-			const outputFile = path.join(outputDir, `${name}.json`);
+		async ({ files }) => {
+			const outputFile = path.join(outputDir, `${files.name}.json`);
 			if (!overwrite) {
 				try {
 					await fs.access(outputFile, fs.F_OK); // try access the file to determine if it exists.
-					return { file, output: outputFile, skipped: true }; // return if successful access
+					return { file: files.face, output: outputFile, skipped: true }; // return if successful access
 				} catch (e) {
 					// ...
 				}
 			}
 
-			const result = {};
+			const ethnicityData = await jsonfile.readFile(files.ethnicity);
+			const faceData = await jsonfile.readFile(files.face);
+			const gender = _.get(faceData, "FaceDetails[0].Gender.Value", "");
+			const ethnicity = ethnicityData
+				.reduce((ethResult, currentValue) => {
+					if (currentValue.value > 0.25) {
+						ethResult.push(currentValue.name.replace("_", " "));
+					}
+					return ethResult;
+				}, [])
+				.join(" Or ");
+			const seedWords = [ethnicity, gender].join(", ");
+			const payload = {
+				prompt: `This is a human person full name generator.\n\nSeed Words: White, Male\nPerson Full Name: Ryan M Loury \n\nSeed Words: East Asian, Female\nPerson Full Name: Kira Lee Xi\n\nSeed Words: Middle Eastern, Male\nPerson Full Name: Muhammad ibn Lahme bi Ajin\n\nSeed Words: White, Male\nPerson Full Name: Joseph Marconi\n\nSeed Words: ${seedWords}\nPerson Full Name:`,
+				temperature: 0.75,
+				max_tokens: 100,
+				top_p: 1,
+				frequency_penalty: 0,
+				presence_penalty: 0,
+				stop: ["\n"]
+			};
+			const response = await request
+				.post("/engines/davinci/completions", payload)
+				.then(({ data }) => data);
+			if (response.choices.length === 0) {
+				throw new Error("No choices returned by the OpenAPI request");
+			}
+			const personName = human.getFullestName(response.choices[0].text.trim());
+			const result = {
+				name: personName,
+				parsed: human.parseName(personName),
+				seedWords,
+				response
+			};
 
 			await jsonfile.writeFile(outputFile, result);
 
-			return { file, output: outputFile };
+			return { files, output: outputFile };
 		},
 		{
 			batchDelay: 200,
-			concurrent: 5
+			concurrent: 5,
+			maxRetries: 3,
+			retryDelay: 1000
 		}
 	);
 
 	// Queue the images for filtering.
 	console.log(
-		chalk.yellow(`Processing facial analysis using AWS Rekognition...`)
+		chalk.yellow(`Processing character data to produce human full names...`)
 	);
-	sources.forEach((file, i) => {
-		q.push({ file, i });
+	sources.forEach((files, i) => {
+		q.push({ files, i });
 	});
 
 	q.on("task_failed", (taskId, err) => {
@@ -89,7 +165,7 @@ mkdirp.sync(outputDir);
 	});
 
 	q.on("task_finish", (taskId, result) => {
-		console.log(chalk.green(`[${taskId}] Successfully painted image`), result);
+		console.log(chalk.green(`[${taskId}] Successfully produced name`), result);
 	});
 
 	await new Promise((resolve) => {

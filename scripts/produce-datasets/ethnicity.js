@@ -27,11 +27,17 @@ const options = require("../utils/options")((program) => {
 });
 const { inspectObject } = require("../utils");
 
+const { CLARIFAI_API_KEY } = process.env;
+
+if (!CLARIFAI_API_KEY) {
+	throw new Error("OpenAI API Key is required to execute this Script");
+}
+
 const { input, output: outputDir, overwrite } = options;
 
 const stub = ClarifaiStub.grpc();
 const metadata = new grpc.Metadata();
-metadata.set("authorization", "Key 014022e6a9d54677acfe9731114ee1e3");
+metadata.set("authorization", `Key ${CLARIFAI_API_KEY}`);
 
 debugLog(`Output Directory: ${outputDir}`);
 
@@ -68,6 +74,7 @@ mkdirp.sync(outputDir);
 			const fileBuffer = await fs.readFile(image);
 			const fileBase64 = Buffer.from(fileBuffer).toString("base64");
 			const result = await new Promise((resolve, reject) => {
+				// Note: One operation is also one reqeust. A request with multiple inputs is an operation for each input.
 				stub.PostModelOutputs(
 					{
 						// This is the model ID of a publicly available General model. You may use any other public or custom model ID.
