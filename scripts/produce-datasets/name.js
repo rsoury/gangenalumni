@@ -126,7 +126,7 @@ mkdirp.sync(outputDir);
 				stop: ["\n"]
 			};
 			const response = await request
-				.post("/engines/curie/completions", payload)
+				.post("/engines/davinci/completions", payload)
 				.then(({ data }) => data);
 			if (response.choices.length === 0) {
 				throw new Error("No choices returned by the OpenAPI request");
