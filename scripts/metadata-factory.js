@@ -18,18 +18,22 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
+const _ = require("lodash");
 const Queue = require("./utils/queue");
 const options = require("./utils/options")((program) => {
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."
 	);
+	program.option("-f, --face-data <value>", "Path to face dataset.");
+	program.option("-e, --ethnicity-data <value>", "Path to ethnicity dataset.");
+	program.option("-n, --name-data <value>", "Path to produced names dataset.");
 	program.option(
-		"--accessories <value>",
+		"-af, --accessories-file <value>",
 		"Path to accessories output JSON file"
 	);
 	program.option(
-		"--enhancements <value>",
+		"-ef, --enhancements-file <value>",
 		"Path to enhancements output JSON file"
 	);
 	program.option(
@@ -40,9 +44,12 @@ const options = require("./utils/options")((program) => {
 const { inspectObject } = require("./utils");
 
 const {
-	input, // Pass Face Recognition Data Set to this parameter
-	accessories: accessoriesInput,
-	enhancements: enhancementsInput,
+	input,
+	faceData: faceDataInput,
+	ethnicityData: ethnicityDataInput,
+	namesData: namesDataInput,
+	accessoriesFile,
+	enhancementsFile,
 	output: outputDir,
 	overwrite
 } = options;
@@ -62,29 +69,56 @@ const contractMetadata = {
 
 debugLog(`Output Directory: ${outputDir}`);
 
-let dataset = [];
-
 // Create dir
 mkdirp.sync(outputDir);
 
 (async () => {
-	const stat = await fs.lstat(input);
-	if (stat.isFile()) {
-		// Use file as image
-		dataset.push(path.resolve(input));
-	} else {
-		// Get images from directory
-		dataset = await glob(`${input}/*.json`, {
-			absolute: true
-		});
-	}
+	const images = await glob(`${input}/*.{jpeg,jpg,png}`, {
+		absolute: true
+	});
+	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
+		absolute: true
+	});
+	const ethnDataSources = await glob(`${ethnicityDataInput}/*.json`, {
+		absolute: true
+	});
+	const namesDataSources = await glob(`${namesDataInput}/*.json`, {
+		absolute: true
+	});
+	const accessoriesDataSource = path.absolute(accessoriesFile);
+	const enhancementsDataSource = path.absolute(enhancementsFile);
+	const accessoriesData = await jsonfile.readFile(accessoriesDataSource);
+	const enhancementsData = await jsonfile.readFile(enhancementsDataSource);
 
-	const accessoriesData = await jsonfile.readFile(accessoriesInput);
-	const enhancementsData = await jsonfile.readFile(enhancementsInput);
+	const getNameFromPath = (filepath) =>
+		path.basename(filepath).split(".").slice(0, -1).join(".");
+	const sources = faceDataSources.map((filepath) => {
+		const fdName = getNameFromPath(filepath);
+		const findFn = (fp) => {
+			const edName = getNameFromPath(fp);
+			return fdName === edName;
+		};
+		const ethnFilepath = ethnDataSources.find(findFn);
+		const namesFilepath = namesDataSources.find(findFn);
+
+		return {
+			id: fdName,
+			face: filepath,
+			ethnicity: ethnFilepath,
+			name: namesFilepath,
+			image: images.find(findFn)
+		};
+	});
 
 	const q = new Queue(
-		async ({ file }) => {
-			const id = path.basename(file).split(".").slice(0, -1).join(".");
+		async ({ files }) => {
+			const { id } = files;
+			const accessories = accessoriesData.accessoriesAdded[id];
+			const enhancements = _.get(
+				enhancementsData.find(({ id: dataId }) => id === dataId),
+				"enhancements",
+				[]
+			);
 			const outputFile = path.join(outputDir, `${id}.json`);
 			if (!overwrite) {
 				try {
@@ -95,30 +129,39 @@ mkdirp.sync(outputDir);
 				}
 			}
 
-			const name = "";
+			const faceData = await jsonfile.readFile(files.face);
+			const ethnicityData = await jsonfile.readFile(files.ethnicity);
+			const nameData = await jsonfile.readFile(files.name);
+
+			const { name } = nameData;
+			// We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
+			const image = `https://example.com/${id}.png`;
+			const attributes = [];
 
 			const result = {
 				name,
-				description: "",
+				description: ``, // Markdown supported
 				external_url: contractMetadata.external_link,
-				image: `https://example.com/${id}.png`,
-				attributes: []
+				image,
+				attributes
 			};
 
 			await jsonfile.writeFile(outputFile, result);
 
-			return { file, output: outputFile };
+			return { files, output: outputFile };
 		},
 		{
 			batchDelay: 200,
-			concurrent: 5
+			concurrent: 5,
+			maxRetries: 3,
+			retryDelay: 1000
 		}
 	);
 
 	// Queue the images for filtering.
 	console.log(chalk.yellow(`Processing dataset to produce NFT metadata...`));
-	dataset.forEach((file, i) => {
-		q.push({ file, i });
+	sources.forEach((files, i) => {
+		q.push({ files, i });
 	});
 
 	q.on("task_failed", (taskId, err) => {

@@ -86,7 +86,7 @@ mkdirp.sync(outputDir);
 		});
 
 		return {
-			name: fdName,
+			id: fdName,
 			face: filepath,
 			ethnicity: ethnFilepath
 		};
@@ -94,7 +94,7 @@ mkdirp.sync(outputDir);
 
 	const q = new Queue(
 		async ({ files }) => {
-			const outputFile = path.join(outputDir, `${files.name}.json`);
+			const outputFile = path.join(outputDir, `${files.id}.json`);
 			if (!overwrite) {
 				try {
 					await fs.access(outputFile, fs.F_OK); // try access the file to determine if it exists.
