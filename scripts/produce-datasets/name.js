@@ -126,7 +126,7 @@ mkdirp.sync(outputDir);
 				stop: ["\n"]
 			};
 			const response = await request
-				.post("/engines/davinci/completions", payload)
+				.post("/engines/curie/completions", payload)
 				.then(({ data }) => data);
 			if (response.choices.length === 0) {
 				throw new Error("No choices returned by the OpenAPI request");
@@ -138,6 +138,9 @@ mkdirp.sync(outputDir);
 				seedWords,
 				response
 			};
+			if (_.isEmpty(result.name)) {
+				throw new Error("No text returned by the OpenAPI request");
+			}
 
 			await jsonfile.writeFile(outputFile, result);
 
