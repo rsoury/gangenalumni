@@ -37,6 +37,10 @@ const options = require("./utils/options")((program) => {
 		"Path to enhancements output JSON file"
 	);
 	program.option(
+		"-u, --image-url <value>",
+		"A Image URL to associate to metadata. The {ID} placeholder is replaced by the image ID."
+	);
+	program.option(
 		"--overwrite",
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
 	);
@@ -51,13 +55,13 @@ const {
 	accessoriesFile,
 	enhancementsFile,
 	output: outputDir,
+	imageUrl,
 	overwrite
 } = options;
 
 const contractMetadata = {
 	name: "Automatically Animated",
-	description:
-		"OpenSea Creatures are adorable aquatic beings primarily for demonstrating what can be done using the OpenSea platform. Adopt one today to try out all the OpenSea buying, selling, and bidding feature set.",
+	description: ``,
 	image: "https://automaticallyanimated.com/image.png",
 	external_link: "https://automaticallyanimated.com",
 	seller_fee_basis_points: 250, // Indicates a 2.5% seller fee.
@@ -73,9 +77,21 @@ debugLog(`Output Directory: ${outputDir}`);
 mkdirp.sync(outputDir);
 
 (async () => {
-	const images = await glob(`${input}/*.{jpeg,jpg,png}`, {
-		absolute: true
-	});
+	const contractDescription = await fs.readFile(
+		path.resolve(__dirname, "../md/contract-description.md")
+	);
+	contractMetadata.description = contractDescription;
+
+	const descriptionTemplate = await fs.readFile(
+		path.resolve(__dirname, "../md/description-template.md")
+	);
+
+	let images = [];
+	if (input) {
+		images = await glob(`${input}/*.{jpeg,jpg,png}`, {
+			absolute: true
+		});
+	}
 	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
 		absolute: true
 	});
@@ -123,7 +139,7 @@ mkdirp.sync(outputDir);
 			if (!overwrite) {
 				try {
 					await fs.access(outputFile, fs.F_OK); // try access the file to determine if it exists.
-					return { file, output: outputFile, skipped: true }; // return if successful access
+					return { files, output: outputFile, skipped: true }; // return if successful access
 				} catch (e) {
 					// ...
 				}
@@ -134,13 +150,30 @@ mkdirp.sync(outputDir);
 			const nameData = await jsonfile.readFile(files.name);
 
 			const { name } = nameData;
-			// We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
-			const image = `https://example.com/${id}.png`;
+			// TODO: We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
+			let image = "";
+			if (imageUrl) {
+				image = imageUrl.replace("{ID}", id);
+			} else if (images.length) {
+				// ...
+			}
 			const attributes = [];
+
+			enhancements.forEach((e) => {});
+
+			const attrText = [].reduce((acc, current) => {
+				acc += `- ${current}\n`;
+				return acc;
+			}, "");
+
+			const description = descriptionTemplate
+				.replace("{{ name }}", name)
+				.replace("{{ id }}", id)
+				.replace("{{ attributes }}", attrText);
 
 			const result = {
 				name,
-				description: ``, // Markdown supported
+				description,
 				external_url: contractMetadata.external_link,
 				image,
 				attributes

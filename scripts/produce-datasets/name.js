@@ -114,10 +114,10 @@ mkdirp.sync(outputDir);
 					}
 					return ethResult;
 				}, [])
-				.join(" Or ");
+				.join(" And ");
 			const seedWords = [ethnicity, gender].join(", ");
 			const payload = {
-				prompt: `This is a human person full name generator.\n\nSeed Words: White, Male\nPerson Full Name: Ryan M Loury \n\nSeed Words: East Asian, Female\nPerson Full Name: Kira Lee Xi\n\nSeed Words: Middle Eastern, Male\nPerson Full Name: Muhammad ibn Lahme bi Ajin\n\nSeed Words: White, Male\nPerson Full Name: Joseph Marconi\n\nSeed Words: ${seedWords}\nPerson Full Name:`,
+				prompt: `This is a human person full name generator.\n\nSeed Words: White, Male\nPerson Full Name: Joseph Marconi\n\nSeed Words: East Asian, Female\nPerson Full Name: Kira Lee Xi\n\nSeed Words: Middle Eastern, Male\nPerson Full Name: Muhammad ibn Lahme bi Ajin\n\nSeed Words: White And Middle Eastern, Male\nPerson Full Name: Ryan M El Khoury \n\nSeed Words: ${seedWords}\nPerson Full Name:`,
 				temperature: 0.75,
 				max_tokens: 100,
 				top_p: 1,
