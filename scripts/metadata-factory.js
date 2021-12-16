@@ -51,7 +51,7 @@ const {
 	input,
 	faceData: faceDataInput,
 	ethnicityData: ethnicityDataInput,
-	namesData: namesDataInput,
+	nameData: nameDataInput,
 	accessoriesFile,
 	enhancementsFile,
 	output: outputDir,
@@ -99,12 +99,14 @@ mkdirp.sync(outputDir);
 
 (async () => {
 	const contractDescription = await fs.readFile(
-		path.resolve(__dirname, "../md/contract-description.md")
+		path.resolve(__dirname, "../md/contract-description.md"),
+		"utf-8"
 	);
 	contractMetadata.description = contractDescription;
 
 	const descriptionTemplate = await fs.readFile(
-		path.resolve(__dirname, "../md/description-template.md")
+		path.resolve(__dirname, "../md/description-template.md"),
+		"utf-8"
 	);
 
 	let images = [];
@@ -119,11 +121,11 @@ mkdirp.sync(outputDir);
 	const ethnDataSources = await glob(`${ethnicityDataInput}/*.json`, {
 		absolute: true
 	});
-	const namesDataSources = await glob(`${namesDataInput}/*.json`, {
+	const nameDataSources = await glob(`${nameDataInput}/*.json`, {
 		absolute: true
 	});
-	const accessoriesDataSource = path.absolute(accessoriesFile);
-	const enhancementsDataSource = path.absolute(enhancementsFile);
+	const accessoriesDataSource = path.resolve(accessoriesFile);
+	const enhancementsDataSource = path.resolve(enhancementsFile);
 	const accessoriesData = await jsonfile.readFile(accessoriesDataSource);
 	const enhancementsData = await jsonfile.readFile(enhancementsDataSource);
 
@@ -136,7 +138,7 @@ mkdirp.sync(outputDir);
 			return fdName === edName;
 		};
 		const ethnFilepath = ethnDataSources.find(findFn);
-		const namesFilepath = namesDataSources.find(findFn);
+		const namesFilepath = nameDataSources.find(findFn);
 
 		return {
 			id: fdName,
@@ -150,7 +152,8 @@ mkdirp.sync(outputDir);
 	const q = new Queue(
 		async ({ files }) => {
 			const { id } = files;
-			const accessories = accessoriesData.accessoriesAdded[id];
+			const accessories =
+				_.get(accessoriesData, `accessoriesAdded`, {})[id] || {};
 			const enhancements = _.get(
 				enhancementsData.find(({ id: dataId }) => id === dataId),
 				"enhancements",
@@ -166,15 +169,17 @@ mkdirp.sync(outputDir);
 				}
 			}
 
-			const faceData = await jsonfile.readFile(files.face);
-			const ethnicityData = await jsonfile.readFile(files.ethnicity);
-			const nameData = await jsonfile.readFile(files.name);
+			const faceData = files.face ? await jsonfile.readFile(files.face) : {};
+			const ethnicityData = files.ethnicity
+				? await jsonfile.readFile(files.ethnicity)
+				: {};
+			const nameData = files.name ? await jsonfile.readFile(files.name) : {};
 
 			const { name } = nameData;
 			// // TODO: We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
 			let image = "";
 			if (imageUrl) {
-				image = imageUrl.replaceAll("{ID}", id);
+				image = imageUrl.replaceAll("{ID}", id).replaceAll("{id}", id);
 			} else if (images.length) {
 				// ...
 			}
@@ -222,7 +227,7 @@ mkdirp.sync(outputDir);
 				Math.floor(
 					Math.random() * faceDetails.AgeRange.High - faceDetails.AgeRange.Low
 				) + faceDetails.AgeRange.Low;
-			const mood = _.startCase(faceDetails.Emotions[0].Type);
+			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
 			attributes.push({
 				trait_type: "Gender",
 				value: gender

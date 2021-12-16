@@ -32,3 +32,5 @@ data/ethnicity/*
 !data/ethnicity/.gitkeep
 data/name/*
 !data/name/.gitkeep
+data/nft/*
+!data/nft/.gitkeep
