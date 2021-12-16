@@ -59,6 +59,27 @@ const {
 	overwrite
 } = options;
 
+const facialHairMapping = {
+	Hipster: "Stubble",
+	"Grand Goatee": "Extended Goatee",
+	"Petite Goatee": "Goatee",
+	Goatee: "Circle Beard",
+	Lion: "Chin Curtain"
+};
+const makeupMapping = {
+	Makeup: "Youthful",
+	"Makeup 2": "Light",
+	"Makeup 3": "Casual",
+	"Makeup 4": "Fair",
+	"No Makeup": "Au Naturel"
+};
+const ethnicityMapping = {
+	White: "Caucasian",
+	Black: "African",
+	Indian: "Southern Asian",
+	Latino_Hispanic: "Latino/Hispanic"
+};
+
 const contractMetadata = {
 	name: "Automatically Animated",
 	description: ``,
@@ -150,16 +171,82 @@ mkdirp.sync(outputDir);
 			const nameData = await jsonfile.readFile(files.name);
 
 			const { name } = nameData;
-			// TODO: We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
+			// // TODO: We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
 			let image = "";
 			if (imageUrl) {
-				image = imageUrl.replace("{ID}", id);
+				image = imageUrl.replaceAll("{ID}", id);
 			} else if (images.length) {
 				// ...
 			}
 			const attributes = [];
 
-			enhancements.forEach((e) => {});
+			// Accessories are quite straight forward
+			Object.entries(accessories).forEach(([, value]) => {
+				const fValue = _.startCase(value.replaceAll("-", " "));
+				attributes.push({
+					trait_type: "Accessory",
+					value: fValue
+				});
+			});
+
+			enhancements.forEach((e) => {
+				if (e.name === "Beards") {
+					let value = e.type;
+					if (typeof facialHairMapping[e.type] !== "undefined") {
+						value = facialHairMapping[e.type];
+					}
+					attributes.push({
+						trait_type: "Facial Hair",
+						value
+					});
+				}
+				if (e.name === "Makeup") {
+					let value = e.type;
+					if (typeof makeupMapping[e.type] !== "undefined") {
+						value = makeupMapping[e.type];
+					}
+					attributes.push({
+						trait_type: "Makeup",
+						value
+					});
+				}
+			});
+
+			const faceDetails = faceData.FaceDetails[0];
+
+			const gender =
+				faceDetails.Gender.Confidence > 0.8
+					? faceDetails.Gender.Value
+					: "Non-Binary";
+			const age =
+				Math.floor(
+					Math.random() * faceDetails.AgeRange.High - faceDetails.AgeRange.Low
+				) + faceDetails.AgeRange.Low;
+			const mood = _.startCase(faceDetails.Emotions[0].Type);
+			attributes.push({
+				trait_type: "Gender",
+				value: gender
+			});
+			attributes.push({
+				trait_type: "Age",
+				value: age
+			});
+			attributes.push({
+				trait_type: "Mood",
+				value: mood
+			});
+
+			ethnicityData.forEach((eth) => {
+				if (eth.value > 0.25) {
+					attributes.push({
+						trait_type: "Ethnicity",
+						value:
+							typeof ethnicityMapping[eth.name] === "undefined"
+								? eth.name
+								: ethnicityMapping[eth.name]
+					});
+				}
+			});
 
 			const attrText = [].reduce((acc, current) => {
 				acc += `- ${current}\n`;
@@ -167,9 +254,9 @@ mkdirp.sync(outputDir);
 			}, "");
 
 			const description = descriptionTemplate
-				.replace("{{ name }}", name)
-				.replace("{{ id }}", id)
-				.replace("{{ attributes }}", attrText);
+				.replaceAll("{{ name }}", name)
+				.replaceAll("{{ id }}", id)
+				.replaceAll("{{ attributes }}", attrText);
 
 			const result = {
 				name,

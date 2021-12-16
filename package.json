@@ -7,6 +7,7 @@
 	"license": "UNLICENSED",
 	"private": true,
 	"scripts": {
+		"metadata": "node ./scripts/metadata-factory",
 		"name-datasets": "node ./scripts/produce-datasets/name",
 		"ethnicity-datasets": "node ./scripts/produce-datasets/ethnicity",
 		"face-datasets": "node ./scripts/produce-datasets/face",
