@@ -44,6 +44,7 @@ const options = require("./utils/options")((program) => {
 		"--overwrite",
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
 	);
+	program.option("--hex", "Output the files using Hex Format");
 });
 const { inspectObject } = require("./utils");
 
@@ -56,7 +57,8 @@ const {
 	enhancementsFile,
 	output: outputDir,
 	imageUrl,
-	overwrite
+	overwrite,
+	hex: useHex
 } = options;
 
 const facialHairMapping = {
@@ -159,7 +161,10 @@ mkdirp.sync(outputDir);
 				"enhancements",
 				[]
 			);
-			const outputFile = path.join(outputDir, `${id}.json`);
+			const outputFilename = !useHex
+				? id
+				: _.padStart(parseInt(id, 10).toString(16), 64, "0");
+			const outputFile = path.join(outputDir, `${outputFilename}.json`);
 			if (!overwrite) {
 				try {
 					await fs.access(outputFile, fs.F_OK); // try access the file to determine if it exists.
