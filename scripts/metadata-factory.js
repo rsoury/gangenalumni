@@ -190,6 +190,42 @@ mkdirp.sync(outputDir);
 			}
 			const attributes = [];
 
+			const faceDetails = faceData.FaceDetails[0];
+
+			const gender =
+				faceDetails.Gender.Confidence > 0.8
+					? faceDetails.Gender.Value
+					: "Non-Binary";
+			const age =
+				Math.floor(
+					Math.random() * (faceDetails.AgeRange.High - faceDetails.AgeRange.Low)
+				) + faceDetails.AgeRange.Low;
+			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
+			attributes.push({
+				trait_type: "Gender",
+				value: gender
+			});
+			attributes.push({
+				trait_type: "Age",
+				value: age
+			});
+			attributes.push({
+				trait_type: "Mood",
+				value: mood
+			});
+
+			ethnicityData.forEach((eth) => {
+				if (eth.value > 0.25) {
+					attributes.push({
+						trait_type: "Ethnicity",
+						value:
+							typeof ethnicityMapping[eth.name] === "undefined"
+								? eth.name
+								: ethnicityMapping[eth.name]
+					});
+				}
+			});
+
 			// Accessories are quite straight forward
 			Object.entries(accessories).forEach(([, value]) => {
 				const fValue = _.startCase(value.replaceAll("-", " "));
@@ -222,46 +258,11 @@ mkdirp.sync(outputDir);
 				}
 			});
 
-			const faceDetails = faceData.FaceDetails[0];
-
-			const gender =
-				faceDetails.Gender.Confidence > 0.8
-					? faceDetails.Gender.Value
-					: "Non-Binary";
-			const age =
-				Math.floor(
-					Math.random() * faceDetails.AgeRange.High - faceDetails.AgeRange.Low
-				) + faceDetails.AgeRange.Low;
-			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
-			attributes.push({
-				trait_type: "Gender",
-				value: gender
-			});
-			attributes.push({
-				trait_type: "Age",
-				value: age
-			});
-			attributes.push({
-				trait_type: "Mood",
-				value: mood
-			});
-
-			ethnicityData.forEach((eth) => {
-				if (eth.value > 0.25) {
-					attributes.push({
-						trait_type: "Ethnicity",
-						value:
-							typeof ethnicityMapping[eth.name] === "undefined"
-								? eth.name
-								: ethnicityMapping[eth.name]
-					});
-				}
-			});
-
-			const attrText = [].reduce((acc, current) => {
-				acc += `- ${current}\n`;
-				return acc;
-			}, "");
+			const attrText = attributes
+				.map((attr) => {
+					return `- ${attr.trait_type}: ${attr.value}`;
+				})
+				.join("\n");
 
 			const description = descriptionTemplate
 				.replaceAll("{{ name }}", name)
