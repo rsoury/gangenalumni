@@ -15,6 +15,14 @@ module.exports = {
 	env: {
 		mocha: true
 	},
+	overrides: [
+		{
+			files: ["test/**/*"],
+			globals: {
+				ethers: "readonly"
+			}
+		}
+	],
 	rules: {
 		// See: https://github.com/benmosher/eslint-plugin-import/issues/496
 		"import/no-extraneous-dependencies": 0,
