@@ -1,10 +1,14 @@
-pragma solidity ^0.5.12;
+// SPDX-License-Identifier: MIT
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import 'multi-token-standard/contracts/tokens/ERC1155/ERC1155.sol';
-import 'multi-token-standard/contracts/tokens/ERC1155/ERC1155Metadata.sol';
-import 'multi-token-standard/contracts/tokens/ERC1155/ERC1155MintBurn.sol';
-import "./Strings.sol";
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+import "./common/meta-transactions/ContentMixin.sol";
+import "./common/meta-transactions/NativeMetaTransaction.sol";
 
 contract OwnableDelegateProxy { }
 
@@ -17,52 +21,58 @@ contract ProxyRegistry {
  * ERC1155Tradable - ERC1155 contract that whitelists an operator address, has create and mint functionality, and supports useful standards from OpenZeppelin,
   like _exists(), name(), symbol(), and totalSupply()
  */
-contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
+contract ERC1155Tradable is ContextMixin, ERC1155, NativeMetaTransaction, Ownable {
   using Strings for string;
+  using SafeMath for uint256;
 
   address proxyRegistryAddress;
-  uint256 private _currentTokenID = 0;
   mapping (uint256 => address) public creators;
   mapping (uint256 => uint256) public tokenSupply;
+  mapping (uint256 => string) customUri;
   // Contract name
   string public name;
   // Contract symbol
   string public symbol;
 
   /**
-   * @dev Require msg.sender to be the creator of the token id
+   * @dev Require _msgSender() to be the creator of the token id
    */
   modifier creatorOnly(uint256 _id) {
-    require(creators[_id] == msg.sender, "ERC1155Tradable#creatorOnly: ONLY_CREATOR_ALLOWED");
+    require(creators[_id] == _msgSender(), "ERC1155Tradable#creatorOnly: ONLY_CREATOR_ALLOWED");
     _;
   }
 
   /**
-   * @dev Require msg.sender to own more than 0 of the token id
+   * @dev Require _msgSender() to own more than 0 of the token id
    */
   modifier ownersOnly(uint256 _id) {
-    require(balances[msg.sender][_id] > 0, "ERC1155Tradable#ownersOnly: ONLY_OWNERS_ALLOWED");
+    require(balanceOf(_msgSender(), _id) > 0, "ERC1155Tradable#ownersOnly: ONLY_OWNERS_ALLOWED");
     _;
   }
 
   constructor(
     string memory _name,
     string memory _symbol,
+    string memory _uri,
     address _proxyRegistryAddress
-  ) public {
+  ) ERC1155(_uri) {
     name = _name;
     symbol = _symbol;
     proxyRegistryAddress = _proxyRegistryAddress;
+    _initializeEIP712(name);
   }
 
   function uri(
     uint256 _id
-  ) public view returns (string memory) {
-    require(_exists(_id), "ERC721Tradable#uri: NONEXISTENT_TOKEN");
-    return Strings.strConcat(
-      baseMetadataURI,
-      Strings.uint2str(_id)
-    );
+  ) override public view returns (string memory) {
+    require(_exists(_id), "ERC1155Tradable#uri: NONEXISTENT_TOKEN");
+    // We have to convert string to bytes to check for existence
+    bytes memory customUriBytes = bytes(customUri[_id]);
+    if (customUriBytes.length > 0) {
+        return customUri[_id];
+    } else {
+        return super.uri(_id);
+    }
   }
 
   /**
@@ -77,19 +87,43 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
   }
 
   /**
-   * @dev Will update the base URL of token's URI
-   * @param _newBaseMetadataURI New base URL of token's URI
+   * @dev Sets a new URI for all token types, by relying on the token type ID
+    * substitution mechanism
+    * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the EIP].
+   * @param _newURI New URI for all tokens
    */
-  function setBaseMetadataURI(
-    string memory _newBaseMetadataURI
+  function setURI(
+    string memory _newURI
   ) public onlyOwner {
-    _setBaseMetadataURI(_newBaseMetadataURI);
+    _setURI(_newURI);
+  }
+
+  /**
+   * @dev Will update the base URI for the token
+   * @param _tokenId The token to update. _msgSender() must be its creator.
+   * @param _newURI New URI for the token.
+   */
+  function setCustomURI(
+    uint256 _tokenId,
+    string memory _newURI
+  ) public creatorOnly(_tokenId) {
+    customUri[_tokenId] = _newURI;
+    emit URI(_newURI, _tokenId);
   }
 
   /**
     * @dev Creates a new token type and assigns _initialSupply to an address
-    * NOTE: remove onlyOwner if you want third parties to create new tokens on your contract (which may change your IDs)
+    * NOTE: remove onlyOwner if you want third parties to create new tokens on
+    *       your contract (which may change your IDs)
+    * NOTE: The token id must be passed. This allows lazy creation of tokens or
+    *       creating NFTs by setting the id's high bits with the method
+    *       described in ERC1155 or to use ids representing values other than
+    *       successive small integers. If you wish to create ids as successive
+    *       small integers you can either subclass this class to count onchain
+    *       or maintain the offchain cache of identifiers recommended in
+    *       ERC1155 and calculate successive ids from that.
     * @param _initialOwner address of the first owner of the token
+    * @param _id The id of the token to create (must not currenty exist).
     * @param _initialSupply amount to supply the first owner
     * @param _uri Optional URI for this token type
     * @param _data Data to pass if receiver is contract
@@ -97,20 +131,21 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
     */
   function create(
     address _initialOwner,
+    uint256 _id,
     uint256 _initialSupply,
-    string calldata _uri,
-    bytes calldata _data
-  ) external onlyOwner returns (uint256) {
-
-    uint256 _id = _getNextTokenID();
-    _incrementTokenTypeId();
-    creators[_id] = msg.sender;
+    string memory _uri,
+    bytes memory _data
+  ) public onlyOwner returns (uint256) {
+    require(!_exists(_id), "token _id already exists");
+    creators[_id] = _msgSender();
 
     if (bytes(_uri).length > 0) {
+      customUri[_id] = _uri;
       emit URI(_uri, _id);
     }
 
     _mint(_initialOwner, _id, _initialSupply, _data);
+
     tokenSupply[_id] = _initialSupply;
     return _id;
   }
@@ -127,7 +162,7 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
     uint256 _id,
     uint256 _quantity,
     bytes memory _data
-  ) public creatorOnly(_id) {
+  ) virtual public creatorOnly(_id) {
     _mint(_to, _id, _quantity, _data);
     tokenSupply[_id] = tokenSupply[_id].add(_quantity);
   }
@@ -147,11 +182,11 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
   ) public {
     for (uint256 i = 0; i < _ids.length; i++) {
       uint256 _id = _ids[i];
-      require(creators[_id] == msg.sender, "ERC1155Tradable#batchMint: ONLY_CREATOR_ALLOWED");
+      require(creators[_id] == _msgSender(), "ERC1155Tradable#batchMint: ONLY_CREATOR_ALLOWED");
       uint256 quantity = _quantities[i];
       tokenSupply[_id] = tokenSupply[_id].add(quantity);
     }
-    _batchMint(_to, _ids, _quantities, _data);
+    _mintBatch(_to, _ids, _quantities, _data);
   }
 
   /**
@@ -176,7 +211,7 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
   function isApprovedForAll(
     address _owner,
     address _operator
-  ) public view returns (bool isOperator) {
+  ) override public view returns (bool isOperator) {
     // Whitelist OpenSea proxy contract for easy trading.
     ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
     if (address(proxyRegistry.proxies(_owner)) == _operator) {
@@ -207,18 +242,21 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
     return creators[_id] != address(0);
   }
 
-  /**
-    * @dev calculates the next token ID based on value of _currentTokenID
-    * @return uint256 for the next token ID
-    */
-  function _getNextTokenID() private view returns (uint256) {
-    return _currentTokenID.add(1);
+  function exists(
+    uint256 _id
+  ) external view returns (bool) {
+    return _exists(_id);
   }
 
-  /**
-    * @dev increments the value of _currentTokenID
-    */
-  function _incrementTokenTypeId() private  {
-    _currentTokenID++;
-  }
+    /**
+     * This is used instead of msg.sender as transactions won't be sent by the original token owner, but by OpenSea.
+     */
+    function _msgSender()
+        internal
+        override
+        view
+        returns (address sender)
+    {
+        return ContextMixin.msgSender();
+    }
 }
