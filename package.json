@@ -17,7 +17,6 @@
 		"paint": "node ./scripts/avatar-paint",
 		"filter": "node ./scripts/avatar-filter",
 		"generate": "node ./scripts/avatar-generator",
-		"postinstall": "make",
 		"lint": "eslint -c ./.eslintrc.js \"{scripts,test}/**/*.js\" && solhint contracts/**/*.sol",
 		"format": "prettier --write {scripts,test}/**/*.js contracts/**/*.sol"
 	},
@@ -41,6 +40,7 @@
 		"solhint-plugin-prettier": "^0.0.5"
 	},
 	"dependencies": {
+		"@openzeppelin/contracts": "^4.4.1",
 		"aws-sdk": "^2.1018.0",
 		"axios": "^0.24.0",
 		"axios-retry": "^3.2.4",
