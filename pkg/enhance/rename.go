@@ -1,4 +1,4 @@
-// A script to renmae the BlueStacks exported files to their appropriate image id using the produced info.json file
+// A script to rename the BlueStacks exported files to their appropriate image id using the produced info.json file
 
 package main
 
@@ -23,6 +23,7 @@ var (
 	renameCmd = &cli.Command{
 		Use:   "rename",
 		Short: "Rename",
+		Long:  "Rename the BlueStacks exported files to their appropriate image id using the produced info.json file.",
 		Run:   Rename,
 	}
 )

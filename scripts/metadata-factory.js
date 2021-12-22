@@ -85,8 +85,8 @@ const ethnicityMapping = {
 const contractMetadata = {
 	name: "Automatically Animated",
 	description: ``,
-	image: "https://automaticallyanimated.com/image.png",
-	external_link: "https://automaticallyanimated.com",
+	image: "https://gangenalumni.com/image.png",
+	external_link: "https://gangenalumni.com",
 	seller_fee_basis_points: 250, // Indicates a 2.5% seller fee.
 	fee_recipient: "0x8D674B63BB0F59fEebc08565AbcB7fdfe3801817" // Where seller fees will be paid to.
 };
@@ -105,6 +105,11 @@ mkdirp.sync(outputDir);
 		"utf-8"
 	);
 	contractMetadata.description = contractDescription;
+
+	await jsonfile.writeFile(
+		path.resolve(outputDir, "contract.json"),
+		contractMetadata
+	);
 
 	const descriptionTemplate = await fs.readFile(
 		path.resolve(__dirname, "../md/description-template.md"),
