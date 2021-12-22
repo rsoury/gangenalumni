@@ -14,16 +14,11 @@ contract NFTContract is ERC1155Tradable {
 
 	constructor(
 		address _proxyRegistryAddress,
+		string memory name,
+		string memory symbol,
 		string memory cURI,
 		string memory tokenURI
-	)
-		ERC1155Tradable(
-			"Gangen Alumni",
-			"GANGA",
-			tokenURI,
-			_proxyRegistryAddress
-		)
-	{
+	) ERC1155Tradable(name, symbol, tokenURI, _proxyRegistryAddress) {
 		_contractURI = cURI;
 	}
 

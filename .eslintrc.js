@@ -21,6 +21,12 @@ module.exports = {
 			globals: {
 				ethers: "readonly"
 			}
+		},
+		{
+			files: ["hardhat.config.js"],
+			globals: {
+				task: "readonly"
+			}
 		}
 	],
 	rules: {
