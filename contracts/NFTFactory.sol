@@ -18,39 +18,23 @@ contract NFTFactory is FactoryERC1155, Ownable, ReentrancyGuard {
 
 	address public proxyRegistryAddress;
 	address public nftAddress;
-	address public lootBoxAddress;
 	string internal constant baseMetadataURI =
 		"https://creatures-api.opensea.io/api/";
-	uint256 constant UINT256_MAX = ~uint256(0);
 
 	/*
 	 * Optionally set this to a small integer to enforce limited existence per option/token ID
 	 * (Otherwise rely on sell orders on OpenSea, which can only be made by the factory owner.)
 	 */
-	uint256 constant SUPPLY_PER_TOKEN_ID = UINT256_MAX;
+	uint256 constant SUPPLY_PER_TOKEN_ID = 1;
 
-	// The number of creature accessories (not creature accessory rarity classes!)
-	uint256 constant NUM_ITEM_OPTIONS = 6;
-
-	/*
-	 * Three different options for minting CreatureAccessories (basic, premium, and gold).
+	/**
+	 * One option for minting NFT
 	 */
-	uint256 public constant BASIC_LOOTBOX = NUM_ITEM_OPTIONS + 0;
-	uint256 public constant PREMIUM_LOOTBOX = NUM_ITEM_OPTIONS + 1;
-	uint256 public constant GOLD_LOOTBOX = NUM_ITEM_OPTIONS + 2;
-	uint256 public constant NUM_LOOTBOX_OPTIONS = 3;
+	uint256 public constant NUM_OPTIONS = 1;
 
-	uint256 public constant NUM_OPTIONS =
-		NUM_ITEM_OPTIONS + NUM_LOOTBOX_OPTIONS;
-
-	constructor(
-		address _proxyRegistryAddress,
-		address _nftAddress,
-		address _lootBoxAddress
-	) {
+	constructor(address _proxyRegistryAddress, address _nftAddress) {
 		proxyRegistryAddress = _proxyRegistryAddress;
 		nftAddress = _nftAddress;
-		lootBoxAddress = _lootBoxAddress;
 	}
 
 	/////
@@ -58,11 +42,11 @@ contract NFTFactory is FactoryERC1155, Ownable, ReentrancyGuard {
 	/////
 
 	function name() external pure override returns (string memory) {
-		return "OpenSea Creature Accessory Pre-Sale";
+		return "Gangen Alumni Pre-Sale";
 	}
 
 	function symbol() external pure override returns (string memory) {
-		return "OSCAP";
+		return "GANGAP";
 	}
 
 	function supportsFactoryInterface() external pure override returns (bool) {
@@ -79,7 +63,7 @@ contract NFTFactory is FactoryERC1155, Ownable, ReentrancyGuard {
 	}
 
 	function numOptions() external pure override returns (uint256) {
-		return NUM_LOOTBOX_OPTIONS + NUM_ITEM_OPTIONS;
+		return NUM_OPTIONS;
 	}
 
 	function uri(uint256 _optionId)
