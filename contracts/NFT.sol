@@ -57,7 +57,7 @@ contract NFTContract is ERC1155Tradable {
 		address from,
 		address[] memory recipients,
 		uint256[][] memory idsPerRecipient
-	) public onlyOwner {
+	) public {
 		for (uint256 i = 0; i < recipients.length; i++) {
 			address recipient = recipients[i];
 			uint256[] memory ids = idsPerRecipient[i];
@@ -74,7 +74,7 @@ contract NFTContract is ERC1155Tradable {
 	/**
 		Mark a single token as permanent in batch
 	 */
-	function makePermanent(uint256 id) public onlyOwner {
+	function makePermanent(uint256 id) public creatorOnly(id) {
 		require(_exists(id), "token id does not exist");
 		string memory tokenURI = uri(id);
 		emit PermanentURI(tokenURI, id);
