@@ -35,26 +35,17 @@ contract NFTContract is ERC1155Tradable {
 	/*
 		Allows contract owner to mass create tokens and issue to initialOwners addresses in a single transaction
 	*/
-	function batchCreate(
-		address[] memory initialOwners,
-		uint256[][] memory ids,
-		uint256[][] memory quantities,
-		string[][] memory uris,
-		bytes[][] memory datas
-	) public {
+	function batchCreate(address[] memory initialOwners, uint256[][] memory ids)
+		public
+	{
 		for (uint256 i = 0; i < initialOwners.length; i++) {
 			address initialOwner = initialOwners[i];
 			uint256[] memory ownersIds = ids[i];
-			uint256[] memory ownersQuantities = quantities[i];
-			string[] memory ownersTokenUris = uris[i];
-			bytes[] memory ownersDatas = datas[i];
 			for (uint256 j = 0; j < ownersIds.length; i++) {
 				uint256 id = ownersIds[j];
-				uint256 quantity = ownersQuantities[i];
-				string memory uri = ownersTokenUris[i];
-				bytes memory data = ownersDatas[i];
+				uint256 quantity = 1;
 
-				super.create(initialOwner, id, quantity, uri, data);
+				super.create(initialOwner, id, quantity, "", "");
 			}
 		}
 	}
@@ -65,22 +56,18 @@ contract NFTContract is ERC1155Tradable {
 	function batchTransferToMany(
 		address from,
 		address[] memory recipients,
-		uint256[][] memory ids,
-		uint256[][] memory quantities,
-		bytes[] memory datas
+		uint256[][] memory idsPerRecipient
 	) public onlyOwner {
 		for (uint256 i = 0; i < recipients.length; i++) {
 			address recipient = recipients[i];
-			uint256[] memory recipientIds = ids[i];
-			uint256[] memory recipientQuantities = quantities[i];
-			bytes memory recipientData = datas[i];
-			super.safeBatchTransferFrom(
-				from,
-				recipient,
-				recipientIds,
-				recipientQuantities,
-				recipientData
-			);
+			uint256[] memory ids = idsPerRecipient[i];
+			uint256[] memory quantities = new uint256[](ids.length);
+			for (uint256 j = 0; j < ids.length; j++) {
+				uint256 quantity = super.balanceOf(from, ids[j]);
+				quantities[j] = quantity;
+			}
+			bytes memory data = "";
+			super.safeBatchTransferFrom(from, recipient, ids, quantities, data);
 		}
 	}
 

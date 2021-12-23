@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
+require("hardhat-contract-sizer");
 
 require("./tasks/account");
 
@@ -47,7 +48,12 @@ module.exports = {
 	},
 	networks: {
 		hardhat: {
-			accounts: [OWNER_PRIVATE_KEY],
+			accounts: [
+				{
+					privateKey: OWNER_PRIVATE_KEY,
+					balance: `${1 * 10 ** 18}`
+				}
+			],
 			chainId: chainIds.hardhart
 		},
 		rinkeby: {
@@ -70,5 +76,11 @@ module.exports = {
 	},
 	etherscan: {
 		apiKey: ETHERSCAN_API_KEY
+	},
+	contractSizer: {
+		alphaSort: false,
+		disambiguatePaths: false,
+		runOnCompile: true,
+		strict: true
 	}
 };
