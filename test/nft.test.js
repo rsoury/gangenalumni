@@ -14,8 +14,9 @@ describe("NFT Smart Contract Tests", () => {
 		const MockProxyRegistry = await ethers.getContractFactory(
 			"MockProxyRegistry"
 		);
+		const mockProxyRegistry = await MockProxyRegistry.deploy();
 		nft = await NFT.deploy(
-			MockProxyRegistry.address,
+			mockProxyRegistry.address,
 			"Gangen Alumni",
 			"GANGA",
 			contractURI,
@@ -23,16 +24,18 @@ describe("NFT Smart Contract Tests", () => {
 		);
 	});
 
-	it("NFT is created successfully", async () => {
+	it("NFT token is created successfully", async () => {
 		const [owner] = await ethers.getSigners();
-		expect(await nft.balanceOf(owner.address)).to.equal(0);
+		expect(await nft.balanceOf(owner.address, 1)).to.equal(0);
 
-		await nft.connect(owner).create(owner.address, 1, 1);
-		expect(await nft.balanceOf(owner.address)).to.equal(1);
+		await nft.connect(owner).create(owner.address, 1, 1, "", []);
+		expect(await nft.balanceOf(owner.address, 1)).to.equal(1);
 	});
 
 	it("Token/Contract URI is set sucessfully", async () => {
 		expect(await nft.contractURI()).to.equal(contractURI);
+		const [owner] = await ethers.getSigners();
+		await nft.connect(owner).create(owner.address, 1, 1, "", []);
 		expect(await nft.uri(1)).to.equal(tokenURI);
 	});
 });
