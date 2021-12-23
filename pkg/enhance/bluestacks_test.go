@@ -41,8 +41,8 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 			enhancementMakeupAssets = append(enhancementMakeupAssets, asset)
 		}
 	}
-	editorEnhancementTypeSelectImagePath := path.Join(cwd, "./test/editor-screen-Eyebrows--1638706561.jpg")
-	editorEnhancementSelectImagePath := path.Join(cwd, "./test/editor-screen-Petite Goatee--1638866689.jpg")
+	editorEnhancementTypeSelectImagePath := path.Join(cwd, "./test/screens/editor-screen-Eyebrows--1638706561.jpg")
+	editorEnhancementSelectImagePath := path.Join(cwd, "./test/screens/editor-screen-Petite Goatee--1638866689.jpg")
 	applyImgPath := path.Join(cwd, "./assets/faceapp/apply.png")
 	saveImgPath := path.Join(cwd, "./assets/faceapp/save.png")
 	applyImg, _, _ := robotgo.DecodeImg(applyImgPath)

@@ -12,6 +12,8 @@ contract NFTContract is ERC1155Tradable {
 	// Create a contract URI variable
 	string private _contractURI;
 
+	event PermanentURI(string _value, uint256 indexed _id);
+
 	constructor(
 		address _proxyRegistryAddress,
 		string memory name,
@@ -79,6 +81,24 @@ contract NFTContract is ERC1155Tradable {
 				recipientQuantities,
 				recipientData
 			);
+		}
+	}
+
+	/**
+		Mark a single token as permanent in batch
+	 */
+	function makePermanent(uint256 id) public onlyOwner {
+		require(_exists(id), "token id does not exist");
+		string memory tokenURI = uri(id);
+		emit PermanentURI(tokenURI, id);
+	}
+
+	/**
+		Mark all tokens permanent in batch
+	 */
+	function batchMakePermanent(uint256[] memory ids) public {
+		for (uint256 i = 0; i < ids.length; i++) {
+			makePermanent(ids[i]);
 		}
 	}
 }
