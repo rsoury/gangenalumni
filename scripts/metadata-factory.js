@@ -277,7 +277,7 @@ mkdirp.sync(outputDir);
 			const result = {
 				name,
 				description,
-				external_url: contractMetadata.external_link,
+				external_url: `${contractMetadata.external_link}?ref=md_external&ref_value=${id}`,
 				image,
 				attributes
 			};
