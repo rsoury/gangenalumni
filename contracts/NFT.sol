@@ -35,14 +35,15 @@ contract NFT is ERC1155Tradable {
 	/*
 		Allows contract owner to mass create tokens and issue to initialOwners addresses in a single transaction
 	*/
-	function batchCreate(address[] memory initialOwners, uint256[][] memory ids)
-		public
-	{
+	function batchCreate(
+		address[] memory initialOwners,
+		uint256[][] memory idsPerOwner
+	) public {
 		for (uint256 i = 0; i < initialOwners.length; i++) {
 			address initialOwner = initialOwners[i];
-			uint256[] memory ownersIds = ids[i];
-			for (uint256 j = 0; j < ownersIds.length; i++) {
-				uint256 id = ownersIds[j];
+			uint256[] memory ids = idsPerOwner[i];
+			for (uint256 j = 0; j < ids.length; j++) {
+				uint256 id = ids[j];
 				uint256 quantity = 1;
 
 				super.create(initialOwner, id, quantity, "", "");
