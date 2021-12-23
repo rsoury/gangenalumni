@@ -5,10 +5,10 @@ pragma solidity ^0.8.0;
 import "./ERC1155Tradable.sol";
 
 /**
- * @title NFTContract
- * NFTContract - a contract for non-fungible tokens using ERC 1155 for batch actions
+ * @title NFT
+ * NFT - a contract for non-fungible tokens using ERC 1155 for batch actions
  */
-contract NFTContract is ERC1155Tradable {
+contract NFT is ERC1155Tradable {
 	// Create a contract URI variable
 	string private _contractURI;
 

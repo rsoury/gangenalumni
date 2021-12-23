@@ -1,6 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-contract-sizer");
+require("hardhat-deploy");
 
 require("./tasks/account");
 
@@ -13,6 +14,7 @@ const {
 	ALCHEMY_API_KEY = "",
 	OWNER_PRIVATE_KEY = "",
 	ETHERSCAN_API_KEY = "",
+	MNEMONIC = "",
 	REPORT_GAS = false
 } = process.env;
 
@@ -48,18 +50,12 @@ module.exports = {
 	},
 	networks: {
 		hardhat: {
-			accounts: [
-				{
-					privateKey: OWNER_PRIVATE_KEY,
-					balance: `${1 * 10 ** 18}`
-				}
-			],
-			chainId: chainIds.hardhart
+			networkId: chainIds.hardhart
 		},
 		rinkeby: {
 			url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
-			accounts: [OWNER_PRIVATE_KEY],
-			chainId: chainIds.rinkeby
+			accounts: [OWNER_PRIVATE_KEY]
+			// chainId: chainIds.rinkeby
 		}
 		// coverage: {
 		// 	url: "http://127.0.0.1:8555"
@@ -80,7 +76,7 @@ module.exports = {
 	contractSizer: {
 		alphaSort: false,
 		disambiguatePaths: false,
-		runOnCompile: true,
+		runOnCompile: false, // Run using `npx hardhat size-contracts`
 		strict: true
 	}
 };

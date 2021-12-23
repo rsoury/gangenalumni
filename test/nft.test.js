@@ -8,18 +8,27 @@ const contractURI =
 	"https://gangenalumni.s3.us-east-2.amazonaws.com/rinkeby/data/contract.json";
 
 describe("NFT Smart Contract Tests", () => {
-	this.beforeEach(async () => {
+	beforeEach(async () => {
 		// This is executed before each test
 		const NFT = await ethers.getContractFactory("NFT");
-		nft = await NFT.deploy("", "Gangen Alumni", "GANGA", contractURI, tokenURI);
+		const MockProxyRegistry = await ethers.getContractFactory(
+			"MockProxyRegistry"
+		);
+		nft = await NFT.deploy(
+			MockProxyRegistry.address,
+			"Gangen Alumni",
+			"GANGA",
+			contractURI,
+			tokenURI
+		);
 	});
 
 	it("NFT is created successfully", async () => {
-		const [account1] = await ethers.getSigners();
-		expect(await nft.balanceOf(account1.address)).to.equal(0);
+		const [owner] = await ethers.getSigners();
+		expect(await nft.balanceOf(owner.address)).to.equal(0);
 
-		await nft.connect(account1).create(account1.address, 1, 1);
-		expect(await nft.balanceOf(account1.address)).to.equal(1);
+		await nft.connect(owner).create(owner.address, 1, 1);
+		expect(await nft.balanceOf(owner.address)).to.equal(1);
 	});
 
 	it("Token/Contract URI is set sucessfully", async () => {
