@@ -1,2 +1,5 @@
 node_modules/
 migrations/
+artifacts/
+**/artifacts
+**/node_modules

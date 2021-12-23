@@ -1,43 +1,74 @@
-require("dotenv").config();
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 
-const { INFURA_API_KEY = "", OWNER_PRIVATE_KEY = "" } = process.env;
+require("./tasks/account");
 
-if (!INFURA_API_KEY) {
-	console.log("ERROR: INFURA_API_KEY is missing");
+const { config: dotenvConfig } = require("dotenv");
+const path = require("path");
+
+dotenvConfig({ path: path.resolve(__dirname, "./.env") });
+
+const {
+	ALCHEMY_API_KEY = "",
+	OWNER_PRIVATE_KEY = "",
+	ETHERSCAN_API_KEY = "",
+	REPORT_GAS = false
+} = process.env;
+
+const chainIds = {
+	goerli: 5,
+	hardhat: 31337,
+	kovan: 42,
+	mainnet: 1,
+	rinkeby: 4,
+	ropsten: 3
+};
+
+if (!ALCHEMY_API_KEY) {
+	console.log("ERROR: ALCHEMY_API_KEY is missing");
 	process.exit(1);
 }
 if (!OWNER_PRIVATE_KEY) {
 	console.log("ERROR: OWNER_PRIVATE_KEY is missing");
 	process.exit(1);
 }
+if (!ETHERSCAN_API_KEY) {
+	console.log("ERROR: ETHERSCAN_API_KEY is missing");
+	process.exit(1);
+}
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-	const accounts = await hre.ethers.getSigners();
-
-	accounts.forEach((account) => {
-		console.log(account.address);
-	});
-});
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
-
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
 module.exports = {
-	solidity: "0.8.4",
-	default: "hardhat",
+	defaultNetwork: "hardhat",
+	gasReporter: {
+		currency: "USD",
+		enabled: !!REPORT_GAS,
+		excludeContracts: [],
+		src: "./contracts"
+	},
 	networks: {
-		ropsten: {
-			url: `https://ropsten.infura.io/v3/${INFURA_API_KEY}`,
-			accounts: [OWNER_PRIVATE_KEY]
+		hardhat: {
+			accounts: [OWNER_PRIVATE_KEY],
+			chainId: chainIds.hardhart
 		},
-		coverage: {
-			url: "http://127.0.0.1:8555"
+		rinkeby: {
+			url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+			accounts: [OWNER_PRIVATE_KEY],
+			chainId: chainIds.rinkeby
 		}
+		// coverage: {
+		// 	url: "http://127.0.0.1:8555"
+		// }
+	},
+	paths: {
+		artifacts: "./artifacts",
+		cache: "./cache",
+		sources: "./contracts",
+		tests: "./test"
+	},
+	solidity: {
+		version: "0.8.4"
+	},
+	etherscan: {
+		apiKey: ETHERSCAN_API_KEY
 	}
 };

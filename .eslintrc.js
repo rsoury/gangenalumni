@@ -23,7 +23,7 @@ module.exports = {
 			}
 		},
 		{
-			files: ["hardhat.config.js"],
+			files: ["hardhat.config.js", "tasks/**/*"],
 			globals: {
 				task: "readonly"
 			}
