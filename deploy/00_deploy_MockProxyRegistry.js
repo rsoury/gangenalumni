@@ -2,6 +2,7 @@
 module.exports = async ({ getNamedAccounts, deployments, network }) => {
 	const { deploy, log } = deployments;
 	const { deployer } = await getNamedAccounts();
+	console.log(deployer);
 	if (!network.live) {
 		// Deploy MockProxyRegistry to local node
 		const mockProxyDeployResult = await deploy("MockProxyRegistry", {
@@ -11,7 +12,7 @@ module.exports = async ({ getNamedAccounts, deployments, network }) => {
 		});
 		if (mockProxyDeployResult.newlyDeployed) {
 			log(
-				`contract MockProxyRegistry deployed at ${mockProxyDeployResult.contract.address} using ${mockProxyDeployResult.receipt.gasUsed} gas`
+				`contract MockProxyRegistry deployed at ${mockProxyDeployResult.address} using ${mockProxyDeployResult.receipt.gasUsed} gas`
 			);
 		}
 	}

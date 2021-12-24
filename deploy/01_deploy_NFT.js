@@ -13,7 +13,9 @@ module.exports = async ({ getNamedAccounts, deployments, network }) => {
 			proxyRegistryAddress = "0xa5409ec958c83c3f309868babaca7c86dcb077c1";
 		}
 	} else {
-		proxyRegistryAddress = await deployments.get("MockProxyRegistry");
+		const proxyRegistry = await deployments.get("MockProxyRegistry");
+		proxyRegistryAddress = proxyRegistry.address;
+		console.log(`Proxy Registry Address:`, proxyRegistryAddress);
 	}
 	if (network.name === "mainnet") {
 		tokenURI =
@@ -41,8 +43,9 @@ module.exports = async ({ getNamedAccounts, deployments, network }) => {
 
 	if (nftDeployResult.newlyDeployed) {
 		log(
-			`contract NFT deployed at ${nftDeployResult.contract.address} using ${nftDeployResult.receipt.gasUsed} gas`
+			`contract NFT deployed at ${nftDeployResult.address} using ${nftDeployResult.receipt.gasUsed} gas`
 		);
 	}
 };
 module.exports.tags = ["NFT"];
+module.exports.dependencies = ["MockProxyRegistry"]; // this ensure the MockProxyRegistry script above is executed first, so `deployments.get('MockProxyRegistry')` succeeds

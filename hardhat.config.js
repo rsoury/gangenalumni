@@ -14,7 +14,7 @@ const {
 	ALCHEMY_API_KEY = "",
 	OWNER_PRIVATE_KEY = "",
 	ETHERSCAN_API_KEY = "",
-	MNEMONIC = "",
+	// MNEMONIC = "",
 	REPORT_GAS = false
 } = process.env;
 
@@ -78,5 +78,10 @@ module.exports = {
 		disambiguatePaths: false,
 		runOnCompile: false, // Run using `npx hardhat size-contracts`
 		strict: true
+	},
+	namedAccounts: {
+		deployer: {
+			default: 0
+		}
 	}
 };
