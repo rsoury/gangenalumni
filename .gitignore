@@ -31,5 +31,5 @@ data/name/*
 !data/name/.gitkeep
 data/nft/*
 !data/nft/.gitkeep
-deployments/localhost/*
-deployments/hardhat/*
+deployments/localhost
+deployments/hardhat
