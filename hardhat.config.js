@@ -3,7 +3,7 @@ require("@nomiclabs/hardhat-etherscan");
 require("hardhat-contract-sizer");
 require("hardhat-deploy");
 
-require("./tasks/account");
+require("./tasks");
 
 const { config: dotenvConfig } = require("dotenv");
 const path = require("path");
@@ -81,7 +81,7 @@ module.exports = {
 	},
 	namedAccounts: {
 		deployer: {
-			default: 0
+			default: 0 // Indicates that on all networks, the first wallet is the Owner of the Smart Contract.
 		}
 	}
 };
