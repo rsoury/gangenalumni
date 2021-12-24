@@ -45,6 +45,7 @@ task("batch-create", "Batch create NFT tokens to addresses")
 			recipients.map(({ address }) => address),
 			recipients.map(({ ids }) => ids)
 		);
+		console.log(`Transaction created: ${tx.hash}\n`);
 		await tx.wait();
 
 		for (let i = 0; i < recipients.length; i += 1) {

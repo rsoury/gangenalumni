@@ -83,7 +83,7 @@ const ethnicityMapping = {
 };
 
 const contractMetadata = {
-	name: "Automatically Animated",
+	name: "Gangen Alumni",
 	description: ``,
 	image: "https://gangenalumni.com/image.png",
 	external_link: "https://gangenalumni.com",
