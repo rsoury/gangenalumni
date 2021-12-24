@@ -8,7 +8,7 @@ task("batch-create", "Batch create NFT tokens to addresses")
 		`
       Input for the batch creation Smart Contract function.
       Input is formatted like so:
-        --input=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266:1,5,49,102|0x70997970C51812dc3A010C7d01b50e0d17dc79C8:2,6,50,105
+        --input "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266:1,5,49,102|0x70997970C51812dc3A010C7d01b50e0d17dc79C8:2,6,50,105"
 
       Either provide a file or input.
     `
@@ -22,7 +22,7 @@ task("batch-create", "Batch create NFT tokens to addresses")
 
 		const recipients = [];
 		if (file) {
-			// Parse the CSV file into the Recipients Array.
+			// TODO: Parse the CSV file into the Recipients Array.
 		} else if (input) {
 			// Parse the Input into the Recipients Array
 			const perAddress = input.split("|");
@@ -40,16 +40,24 @@ task("batch-create", "Batch create NFT tokens to addresses")
 			});
 		}
 
-		const [owner] = ethers.getSigners();
-		const tx = await nft.connect(owner.address).batchCreate(
+		const [owner] = await ethers.getSigners();
+		const tx = await nft.connect(owner).batchCreate(
 			recipients.map(({ address }) => address),
 			recipients.map(({ ids }) => ids)
 		);
-		await tx.await();
+		await tx.wait();
 
-		recipients.forEach((recipient) => {
-			console.log(
-				`${recipient.address}\nTokens: ${recipient.ids.join(", ")}\n`
-			);
-		});
+		for (let i = 0; i < recipients.length; i += 1) {
+			const recipient = recipients[i];
+			console.log(recipient.address);
+			const arr = [];
+			for (let j = 0; j < recipient.ids.length; j += 1) {
+				const balance = await nft.balanceOf(
+					recipient.address,
+					recipient.ids[j]
+				);
+				arr.push(`${recipient.ids[j]} [${balance}]`);
+			}
+			console.log(`Tokens: ${arr.join(", ")}\n`);
+		}
 	});

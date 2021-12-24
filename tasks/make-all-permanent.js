@@ -5,7 +5,7 @@ task("make-all-permanent", "Make all NFT tokens' metadata permanent").setAction(
 		const NFT = await ethers.getContractFactory("NFT");
 		const nft = await NFT.attach(nftDeployment.address);
 
-		const tx = await nft.connect(owner.address).makeAllPermanent();
+		const tx = await nft.connect(owner).makeAllPermanent();
 		const receipt = await tx.wait();
 		console.log(`Result Events:`);
 		console.log(

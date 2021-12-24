@@ -7,7 +7,7 @@ task("make-permanent", "Make a specific NFT token metadata permanent")
 		const nft = await NFT.attach(nftDeployment.address);
 
 		// https://ethereum.stackexchange.com/questions/93757/listening-to-events-using-ethers-js-on-a-hardhat-test-network
-		const tx = await nft.connect(owner.address).makePermanent(taskArgs.id);
+		const tx = await nft.connect(owner).makePermanent(taskArgs.id);
 		const receipt = await tx.wait();
 		console.log(`Result Events:`);
 		console.log(
