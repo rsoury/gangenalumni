@@ -53,7 +53,7 @@ describe("NFT Smart Contract Tests", () => {
 			return [i + 1];
 		});
 		// console.log(addresses, idsPerAddress);
-		await nft.connect(owner).batchCreate(addresses, idsPerAddress);
+		await nft.connect(owner).batchCreate(addresses, idsPerAddress, "");
 		const balances = await Promise.all(
 			accounts.map((account, i) => {
 				return nft.balanceOf(account.address, i + 1);
@@ -67,7 +67,7 @@ describe("NFT Smart Contract Tests", () => {
 	it("Token batch many transfer runs successfully", async () => {
 		const [owner, ...accounts] = await ethers.getSigners();
 		const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-		await nft.connect(owner).batchCreate([accounts[0].address], [ids]);
+		await nft.connect(owner).batchCreate([accounts[0].address], [ids], "");
 		const balances = await Promise.all(
 			ids.map((id) => {
 				return nft.balanceOf(accounts[0].address, id);
