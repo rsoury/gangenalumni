@@ -18,12 +18,12 @@ const debugLog = require("debug")("avatar-generate");
 
 const options = require("../utils/options")((program) => {
 	program.option("-n, --number <value>", "The number of images to generate.");
+	program.option("--offset <value>", "The image number offset.");
 });
 
-const { number, s3 } = options;
-
-const ua = new UserAgent();
-const userAgent = ua.toString();
+const { s3 } = options;
+const number = parseInt(options.number || 0, 10);
+const offset = parseInt(options.offset || 0, 10);
 
 // Unique Id for Folder to store files in...
 const currentTs = Date.now();
@@ -36,13 +36,7 @@ const s3BucketName = s3Split.shift();
 const s3BucketKey = s3Split.join("/");
 const s3Client = new S3({ params: { Bucket: s3BucketName } });
 
-const request = axios.create({
-	baseURL: `https://thispersondoesnotexist.com/image`,
-	timeout: 30000,
-	headers: {
-		"User-Agent": userAgent
-	}
-});
+const request = axios.create();
 
 axiosRetry(request, {
 	retries: 3
@@ -55,9 +49,15 @@ if (!s3) {
 
 const q = new Queue(
 	(id, done) => {
+		const ua = new UserAgent();
+		const userAgent = ua.toString();
 		request
-			.get("", {
-				responseType: "arraybuffer"
+			.get(`https://thispersondoesnotexist.com/image`, {
+				timeout: 30000,
+				responseType: "arraybuffer",
+				headers: {
+					"User-Agent": userAgent
+				}
 			})
 			.then((response) =>
 				Buffer.from(response.data, "binary").toString("base64")
@@ -106,7 +106,9 @@ const q = new Queue(
 			});
 	},
 	{
-		batchDelay: 1000
+		batchDelay: 1000,
+		retryDelay: 1000,
+		maxRetries: 3
 	}
 );
 
@@ -125,7 +127,7 @@ q.on("drain", () => {
 	console.log(chalk.cyan(`All done!`));
 });
 
-for (let i = 1; i < number + 1; i += 1) {
+for (let i = offset + 1; i < number + 1; i += 1) {
 	q.push(i);
 }
 
