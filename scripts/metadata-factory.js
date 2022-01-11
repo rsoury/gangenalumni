@@ -85,10 +85,11 @@ const ethnicityMapping = {
 const contractMetadata = {
 	name: "Gangen Alumni",
 	description: ``,
-	image: "https://gangenalumni.com/image.png",
-	external_link: "https://gangenalumni.com",
-	seller_fee_basis_points: 250, // Indicates a 2.5% seller fee.
-	fee_recipient: "0x8D674B63BB0F59fEebc08565AbcB7fdfe3801817" // Where seller fees will be paid to.
+	image:
+		"https://gangenalumni.com/wp-content/uploads/2021/12/cropped-GangenAlumni-Icon.png",
+	external_link: "https://gangenalumni.com"
+	// seller_fee_basis_points: 250, // Indicates a 2.5% seller fee.
+	// fee_recipient: "0x8D674B63BB0F59fEebc08565AbcB7fdfe3801817" // Where seller fees will be paid to.
 };
 
 // Unique Id for Folder to store files in...
