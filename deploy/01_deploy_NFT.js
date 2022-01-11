@@ -19,7 +19,7 @@ module.exports = async ({ getNamedAccounts, deployments, network }) => {
 	}
 	if (network.name === "mainnet") {
 		tokenURI =
-			"https://gangenalumni.s3.us-east-2.amazonaws.com/mainnet/data/{id}.json";
+			"https://gangenalumni.s3.us-east-2.amazonaws.com/mainnet/data/{id}.json"; // TODO: Update to use IPFS
 		contractURI =
 			"https://gangenalumni.s3.us-east-2.amazonaws.com/mainnet/data/contract.json";
 	} else {
