@@ -16,7 +16,9 @@ const ono = require("ono");
 const mkdirp = require("mkdirp");
 const debugLog = require("debug")("avatar-generate");
 
-const options = require("../utils/options")();
+const options = require("../utils/options")((program) => {
+	program.option("-n, --number <value>", "The number of images to generate.");
+});
 
 const { number, s3 } = options;
 
@@ -128,7 +130,7 @@ for (let i = 1; i < number + 1; i += 1) {
 }
 
 (async () => {
-	await fs.writeFile(
+	await fs.promises.writeFile(
 		path.join(outputDir, "info.json"),
 		JSON.stringify({
 			script: "filter",
