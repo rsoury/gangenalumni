@@ -13,12 +13,16 @@ task("batch-create", "Batch create NFT tokens to addresses")
       Either provide a file or input.
     `
 	)
+	.addOptionalParam(
+		"customUri",
+		`The Custom URI to use for this given batch of NFTs`
+	)
 	.setAction(async (taskArgs, { ethers, deployments }) => {
 		const nftDeployment = await deployments.get("NFT");
 		const NFT = await ethers.getContractFactory("NFT");
 		const nft = await NFT.attach(nftDeployment.address);
 
-		const { file, input } = taskArgs;
+		const { file, input, customUri = "" } = taskArgs;
 
 		const recipients = [];
 		if (file) {
@@ -43,7 +47,8 @@ task("batch-create", "Batch create NFT tokens to addresses")
 		const [owner] = await ethers.getSigners();
 		const tx = await nft.connect(owner).batchCreate(
 			recipients.map(({ address }) => address),
-			recipients.map(({ ids }) => ids)
+			recipients.map(({ ids }) => ids),
+			customUri
 		);
 		console.log(`Transaction created: ${tx.hash}\n`);
 		await tx.wait();
