@@ -4,22 +4,14 @@ VERSION := 1.0.0
 default:
 	# Compiling...
 	make clean
-	make snapcamera
-	make enhance
+	make nft
 
 .PHONY: clean
 clean:
-	rm -rf ./bin/snapcamera
-	rm -rf ./bin/enhance
+	rm -rf ./bin/nft
 
-.PHONY: snapcamera
-snapcamera:
-	# Compiling Snapcamera script...
-	go build -o bin/snapcamera ./pkg/snapcamera
-	chmod +x bin/snapcamera
-
-.PHONY: enhance
-enhance:
+.PHONY: nft
+nft:
 	# Compiling Enhance script...
-	go build -o bin/enhance ./pkg/enhance
-	chmod +x bin/enhance
+	go build -o bin/nft ./cmd
+	chmod +x bin/nft
