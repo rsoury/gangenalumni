@@ -33,11 +33,11 @@ func init() {
 func ScanGenerated(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
 	// cascadeFile, _ := cmd.Flags().GetString("cascade-file")
-	maxQueue := 50
+	maxQueue := 100
 	queue := make(chan string, maxQueue)
 	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 	s.Start()
-	sStatus := [50][2]string{}
+	sStatus := [100][2]string{}
 	similars := [][2]string{}
 
 	log.Println("Start directory scan...")
