@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	scanGenerated = &cli.Command{
+	scanGeneratedCmd = &cli.Command{
 		Use:   "scan",
 		Short: "Scan directory of generated images for duplicates or invalid humans",
 		Run:   ScanGenerated,
@@ -25,20 +25,26 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(scanGenerated)
+	rootCmd.AddCommand(scanGeneratedCmd)
+
+	scanGeneratedCmd.PersistentFlags().Int("max-queue", 20, "Maximum number of parallel images to process")
 
 	_ = renameCmd.MarkFlagRequired("source")
 }
 
 func ScanGenerated(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
-	// cascadeFile, _ := cmd.Flags().GetString("cascade-file")
-	maxQueue := 100
+	maxQueue, _ := cmd.Flags().GetInt("max-queue")
 	queue := make(chan string, maxQueue)
 	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 	s.Start()
-	sStatus := [100][2]string{}
+	sStatus := [][2]string{}
 	similars := [][2]string{}
+
+	// Populate the array.
+	for i := 0; i < maxQueue; i++ {
+		sStatus = append(sStatus, [2]string{})
+	}
 
 	log.Println("Start directory scan...")
 
