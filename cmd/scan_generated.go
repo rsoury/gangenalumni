@@ -28,8 +28,6 @@ func init() {
 	rootCmd.AddCommand(scanGeneratedCmd)
 
 	scanGeneratedCmd.PersistentFlags().Int("max-queue", 20, "Maximum number of parallel images to process")
-
-	_ = renameCmd.MarkFlagRequired("source")
 }
 
 func ScanGenerated(cmd *cli.Command, args []string) {
