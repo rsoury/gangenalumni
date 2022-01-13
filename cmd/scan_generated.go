@@ -4,10 +4,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"path"
 	"path/filepath"
+	"sync"
+	"time"
 
+	"github.com/briandowns/spinner"
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/imgo"
 )
@@ -29,72 +33,67 @@ func init() {
 func ScanGenerated(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
 	// cascadeFile, _ := cmd.Flags().GetString("cascade-file")
+	maxQueue := 50
+	queue := make(chan string, maxQueue)
+	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+	s.Start()
+	sStatus := [50][2]string{}
+	similars := [][2]string{}
 
 	log.Println("Start directory scan...")
-
-	// // load classifier to recognize faces
-	// classifier := gocv.NewCascadeClassifier()
-
-	// if !classifier.Load(cascadeFile) {
-	// 	log.Fatalf("Error reading cascade file: %v\n", cascadeFile)
-	// }
 
 	filePaths, err := filepath.Glob(path.Join(sourceDir, "/*.jpeg"))
 	if err != nil {
 		log.Fatal("ERROR: ", err)
 	}
 
-	for _, sourceImagePath := range filePaths {
-		srcFilename := filepath.Base(sourceImagePath)
-		srcExtension := filepath.Ext(srcFilename)
-		srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
-		srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
+	var wg sync.WaitGroup
+	for i := 0; i < maxQueue; i++ {
+		wg.Add(1)
+		go func(index int) {
+			for sourceImagePath := range queue {
+				srcFilename := filepath.Base(sourceImagePath)
+				srcExtension := filepath.Ext(srcFilename)
+				srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
+				srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
+				sStatus[index][0] = srcId
+				for _, compareImagePath := range filePaths {
+					if sourceImagePath == compareImagePath {
+						continue
+					}
+					cmpFilename := filepath.Base(compareImagePath)
+					cmpExtension := filepath.Ext(cmpFilename)
+					cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
 
-		for _, compareImagePath := range filePaths {
-			if sourceImagePath == compareImagePath {
-				continue
+					// Update suffix
+					sStatus[index][1] = cmpId
+					suffix := "\n"
+					for _, status := range sStatus {
+						suffix += fmt.Sprintf("Comparing source %s to %s\n", status[0], status[1])
+					}
+					s.Suffix = suffix
+
+					cmpImg, _, _ := imgo.DecodeFile(compareImagePath)
+					isSimilar := imagesSimilar(srcImg, cmpImg)
+					if isSimilar {
+						similars = append(similars, [2]string{srcId, cmpId})
+					}
+				}
 			}
-			cmpFilename := filepath.Base(compareImagePath)
-			cmpExtension := filepath.Ext(cmpFilename)
-			cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
-			cmpImg, _, _ := imgo.DecodeFile(compareImagePath)
-			isSimilar := imagesSimilar(srcImg, cmpImg)
-			if isSimilar {
-				log.Printf("WARN: %s similar to %s", srcId, cmpId)
-			}
-		}
-
-		// // prepare image matrix
-		// srcMat, _ := gocv.ImageToMatRGB(srcImg)
-		// gocv.CvtColor(srcMat, &srcMat, gocv.ColorRGBAToGray)
-		// defer srcMat.Close()
-
-		// // detect eyes
-		// eyesRects := classifier.DetectMultiScale(srcMat)
-		// var detected []image.Rectangle
-		// for _, r := range eyesRects {
-		// 	if r.Dx() > 20 {
-		// 		detected = append(detected, r)
-		// 	}
-		// }
-		// log.Printf("DEBUG: detected %d eyes in %s", len(detected), srcId)
-		// if len(detected) > 2 {
-		// 	log.Printf("WARN: detected multiple faces in %s", srcId)
-		// 	go func() {
-		// 		borderColor := color.RGBA{0, 0, 255, 0}
-		// 		imgMat, _ := gocv.ImageToMatRGB(srcImg)
-		// 		defer imgMat.Close()
-		// 		for _, r := range detected {
-		// 			gocv.Rectangle(&imgMat, r, borderColor, 3)
-		// 		}
-		// 		if gocv.IMWrite(fmt.Sprintf("./tmp/scan-generated-debug/face-%s.jpeg", srcId), imgMat) {
-		// 			log.Printf("Successfully created face-%v image with %d eyes detected\n", srcId, len(detected))
-		// 		} else {
-		// 			log.Printf("Failed to create face-%v image with %d eyes detected\n", srcId, len(detected))
-		// 		}
-		// 	}()
-		// }
+			wg.Done()
+		}(i)
 	}
 
-	log.Println("All done!")
+	for _, sourceImagePath := range filePaths {
+		queue <- sourceImagePath
+	}
+
+	close(queue)
+	wg.Wait()
+	s.Stop()
+
+	log.Println("All done!\nResult:")
+	for _, similar := range similars {
+		log.Println(fmt.Sprintf("Source %s similar to %s", similar[0], similar[1]))
+	}
 }
