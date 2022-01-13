@@ -23,7 +23,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strconv"
 	"strings"
 	"time"
@@ -414,9 +413,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Printf("ERROR: Cannot select gender switch icon - %v\n", err.Error())
 			continue
 		}
-		if debugMode {
-			q.Q("Gender Switch Icon Coords: ", genderSwitchIconCoords)
-		}
+		// if debugMode {
+		// 	q.Q("Gender Switch Icon Coords: ", genderSwitchIconCoords)
+		// }
 		bluestacks.MoveClick(genderSwitchIconCoords.X, genderSwitchIconCoords.Y)
 		robotgo.MilliSleep(250)
 		editorScreenImg = robotgo.CaptureImg()
@@ -427,9 +426,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			log.Printf("ERROR: Cannot select gender switch option - %v\n", err.Error())
 			continue
 		}
-		if debugMode {
-			q.Q("Gender Switch Icon Coords: ", genderSwitchOptionCoords)
-		}
+		// if debugMode {
+		// 	q.Q("Gender Switch Icon Coords: ", genderSwitchOptionCoords)
+		// }
 		bluestacks.MoveClick(genderSwitchOptionCoords.X, genderSwitchOptionCoords.Y)
 		robotgo.MilliSleep(250)
 
@@ -500,9 +499,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
 				continue
 			}
-			if debugMode {
-				q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
-			}
+			// if debugMode {
+			// 	q.Q("Enhancement Coords: ", enhancement.Name, eCoords)
+			// }
 			bluestacks.MoveClick(eCoords.X, eCoords.Y)
 			robotgo.MilliSleep(1000)
 			log.Printf("Image ID %v - Entered into enhancement %s\n", imageId, enhancement.Name)
@@ -521,9 +520,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
 				}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
-				if debugMode {
-					q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
-				}
+				// if debugMode {
+				// 	q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
+				// }
 				if err != nil {
 					log.Printf("ERROR: Cannot find enhancement type %s for scroll reference - %v\n", scrollReferenceEnhancementType.Name, err.Error())
 					err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
@@ -553,9 +552,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
 			}, fmt.Sprintf("enhancement-type-%s", eType.Name))
-			if debugMode {
-				q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
-			}
+			// if debugMode {
+			// 	q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
+			// }
 			if err != nil {
 				log.Printf("ERROR: Cannot find enhancement type %s - %v\n", eType.Name, err.Error())
 				err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
@@ -577,9 +576,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
 				continue
 			}
-			if debugMode {
-				q.Q("Apply Coords: ", applyCoords)
-			}
+			// if debugMode {
+			// 	q.Q("Apply Coords: ", applyCoords)
+			// }
 			bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
 			robotgo.Click()          // Double click to make sure....
 			robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
@@ -601,9 +600,9 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())
 				continue
 			}
-			if debugMode {
-				q.Q("Save Coords: ", saveCoords)
-			}
+			// if debugMode {
+			// 	q.Q("Save Coords: ", saveCoords)
+			// }
 			saveCount := 0
 			isSaved := false
 			var postSaveImg image.Image

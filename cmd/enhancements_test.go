@@ -1,7 +1,6 @@
 package main
 
 import (
-	"q"
 	"testing"
 )
 
@@ -9,7 +8,7 @@ import (
 func TestShuffleTypes(t *testing.T) {
 	for _, enh := range enhancements {
 		types := enh.ShuffleTypes()
-		q.Q(types, enh.Types)
+		// q.Q(types, enh.Types)
 		existsCount := 0
 		for _, eType := range enh.Types {
 			// Check that each original enh type is available in the shuffled type

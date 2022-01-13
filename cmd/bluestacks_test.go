@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"q"
 	"strings"
 	"testing"
 
@@ -76,7 +75,7 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 				t.Errorf("Cannot find image inside of processing image: %v\n", err.Error())
 				continue
 			}
-			q.Q(coords, err)
+			// q.Q(coords, err)
 			t.Log(coords)
 
 			imageCoords := getCoordsInImage(coords.X, coords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
@@ -102,7 +101,7 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err.Error())
 			}
-			q.Q(saveCoords, applyCoords)
+			// q.Q(saveCoords, applyCoords)
 
 			applyImgCoords := getCoordsInImage(applyCoords.X, applyCoords.Y, bluestacks.ScreenWidth, bluestacks.ScreenHeight, img)
 			applyRect := image.Rect(applyImgCoords.X-applyImg.Bounds().Dx()/2, applyImgCoords.Y-applyImg.Bounds().Dy()/2, applyImgCoords.X+applyImg.Bounds().Dx()/2, applyImgCoords.Y+applyImg.Bounds().Dy()/2)
