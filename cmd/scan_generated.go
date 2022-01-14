@@ -8,6 +8,7 @@ import (
 	"log"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -29,6 +30,14 @@ func init() {
 
 	scanGeneratedCmd.PersistentFlags().Int("max-queue", 20, "Maximum number of parallel images to process")
 	scanGeneratedCmd.PersistentFlags().Bool("simple", false, "Run the check simply. Only compare images immediately before and after the current source image.")
+}
+
+func getId(imgPath string) string {
+	filename := filepath.Base(imgPath)
+	extension := filepath.Ext(filename)
+	id := filename[0 : len(filename)-len(extension)]
+
+	return id
 }
 
 func ScanGenerated(cmd *cli.Command, args []string) {
@@ -55,25 +64,43 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 	}
 
 	if isSimple {
-		for i, sourceImagePath := range filePaths {
-			srcFilename := filepath.Base(sourceImagePath)
-			srcExtension := filepath.Ext(srcFilename)
-			srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
+		// Order file paths in ascending numeric orders
+		orderedPaths := []string{}
+		for i := 0; i < len(filePaths); i++ {
+			lastIndex := 0
+			if len(orderedPaths) > 0 {
+				id := getId(orderedPaths[len(orderedPaths)-1])
+				lastIndex, _ = strconv.Atoi(id)
+			}
+			newIndex := lastIndex + 1
+			for _, imgPath := range filePaths {
+				currentId := getId(imgPath)
+				currentIndex, _ := strconv.Atoi(currentId)
+				if newIndex == currentIndex {
+					orderedPaths = append(orderedPaths, imgPath)
+					break
+				}
+			}
+		}
+		// for _, imgPath := range orderedPaths {
+		// 	log.Println(imgPath)
+		// }
+
+		for i, sourceImagePath := range orderedPaths {
+			srcId := getId(sourceImagePath)
 			srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
 			var compareImagePaths []string
 			if i != 0 {
-				compareImagePaths = append(compareImagePaths, filePaths[i-1])
+				compareImagePaths = append(compareImagePaths, orderedPaths[i-1])
 			}
-			if i != len(filePaths) {
-				compareImagePaths = append(compareImagePaths, filePaths[i+1])
+			if i != len(orderedPaths) {
+				compareImagePaths = append(compareImagePaths, orderedPaths[i+1])
 			}
 			for _, compareImagePath := range compareImagePaths {
 				if sourceImagePath == compareImagePath {
 					continue
 				}
-				cmpFilename := filepath.Base(compareImagePath)
-				cmpExtension := filepath.Ext(cmpFilename)
-				cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
+				cmpId := getId(compareImagePath)
 
 				// Update suffix
 				s.Suffix = fmt.Sprintf(" Comparing source %s to %s", srcId, cmpId)
