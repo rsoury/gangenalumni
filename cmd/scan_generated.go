@@ -93,7 +93,7 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 			if i != 0 {
 				compareImagePaths = append(compareImagePaths, orderedPaths[i-1])
 			}
-			if i != len(orderedPaths) {
+			if i != len(orderedPaths)-1 {
 				compareImagePaths = append(compareImagePaths, orderedPaths[i+1])
 			}
 			for _, compareImagePath := range compareImagePaths {
