@@ -28,11 +28,14 @@ func init() {
 	rootCmd.AddCommand(scanGeneratedCmd)
 
 	scanGeneratedCmd.PersistentFlags().Int("max-queue", 20, "Maximum number of parallel images to process")
+	scanGeneratedCmd.PersistentFlags().Bool("simple", false, "Run the check simply. Only compare images immediately before and after the current source image.")
 }
 
 func ScanGenerated(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
 	maxQueue, _ := cmd.Flags().GetInt("max-queue")
+	isSimple, _ := cmd.Flags().GetBool("simple")
+
 	queue := make(chan string, maxQueue)
 	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 	s.Start()
@@ -51,49 +54,83 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 		log.Fatal("ERROR: ", err)
 	}
 
-	var wg sync.WaitGroup
-	for i := 0; i < maxQueue; i++ {
-		wg.Add(1)
-		go func(index int) {
-			for sourceImagePath := range queue {
-				srcFilename := filepath.Base(sourceImagePath)
-				srcExtension := filepath.Ext(srcFilename)
-				srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
-				srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
-				sStatus[index][0] = srcId
-				for _, compareImagePath := range filePaths {
-					if sourceImagePath == compareImagePath {
-						continue
-					}
-					cmpFilename := filepath.Base(compareImagePath)
-					cmpExtension := filepath.Ext(cmpFilename)
-					cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
+	if isSimple {
+		for i, sourceImagePath := range filePaths {
+			srcFilename := filepath.Base(sourceImagePath)
+			srcExtension := filepath.Ext(srcFilename)
+			srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
+			srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
+			var compareImagePaths []string
+			if i != 0 {
+				compareImagePaths = append(compareImagePaths, filePaths[i-1])
+			}
+			if i != len(filePaths) {
+				compareImagePaths = append(compareImagePaths, filePaths[i+1])
+			}
+			for _, compareImagePath := range compareImagePaths {
+				if sourceImagePath == compareImagePath {
+					continue
+				}
+				cmpFilename := filepath.Base(compareImagePath)
+				cmpExtension := filepath.Ext(cmpFilename)
+				cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
 
-					// Update suffix
-					sStatus[index][1] = cmpId
-					suffix := "\n"
-					for _, status := range sStatus {
-						suffix += fmt.Sprintf("Comparing source %s to %s\n", status[0], status[1])
-					}
-					s.Suffix = suffix
+				// Update suffix
+				s.Suffix = fmt.Sprintf(" Comparing source %s to %s", srcId, cmpId)
 
-					cmpImg, _, _ := imgo.DecodeFile(compareImagePath)
-					isSimilar := imagesSimilar(srcImg, cmpImg)
-					if isSimilar {
-						similars = append(similars, [2]string{srcId, cmpId})
-					}
+				cmpImg, _, _ := imgo.DecodeFile(compareImagePath)
+				isSimilar := imagesSimilar(srcImg, cmpImg)
+				if isSimilar {
+					similars = append(similars, [2]string{srcId, cmpId})
 				}
 			}
-			wg.Done()
-		}(i)
+		}
+	} else {
+		var wg sync.WaitGroup
+		for i := 0; i < maxQueue; i++ {
+			wg.Add(1)
+			go func(index int) {
+				for sourceImagePath := range queue {
+					srcFilename := filepath.Base(sourceImagePath)
+					srcExtension := filepath.Ext(srcFilename)
+					srcId := srcFilename[0 : len(srcFilename)-len(srcExtension)]
+					srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
+					sStatus[index][0] = srcId
+					for _, compareImagePath := range filePaths {
+						if sourceImagePath == compareImagePath {
+							continue
+						}
+						cmpFilename := filepath.Base(compareImagePath)
+						cmpExtension := filepath.Ext(cmpFilename)
+						cmpId := cmpFilename[0 : len(cmpFilename)-len(cmpExtension)]
+
+						// Update suffix
+						sStatus[index][1] = cmpId
+						suffix := "\n"
+						for _, status := range sStatus {
+							suffix += fmt.Sprintf("Comparing source %s to %s\n", status[0], status[1])
+						}
+						s.Suffix = suffix
+
+						cmpImg, _, _ := imgo.DecodeFile(compareImagePath)
+						isSimilar := imagesSimilar(srcImg, cmpImg)
+						if isSimilar {
+							similars = append(similars, [2]string{srcId, cmpId})
+						}
+					}
+				}
+				wg.Done()
+			}(i)
+		}
+
+		for _, sourceImagePath := range filePaths {
+			queue <- sourceImagePath
+		}
+
+		close(queue)
+		wg.Wait()
 	}
 
-	for _, sourceImagePath := range filePaths {
-		queue <- sourceImagePath
-	}
-
-	close(queue)
-	wg.Wait()
 	s.Stop()
 
 	log.Println("All done!\nResult:")
