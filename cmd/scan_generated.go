@@ -113,6 +113,7 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 			}
 		}
 	} else {
+		// TODO: This process of scanning takes entirely too long because we're comparing Src to Cmp both ways... solve this if it becomes an issue?
 		var wg sync.WaitGroup
 		for i := 0; i < maxQueue; i++ {
 			wg.Add(1)
