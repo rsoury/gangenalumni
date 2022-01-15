@@ -21,15 +21,11 @@ output
 dist
 build
 bin
-data/aws/*
+data/**/*
 !data/aws/.gitkeep
-data/face/*
 !data/face/.gitkeep
-data/ethnicity/*
 !data/ethnicity/.gitkeep
-data/name/*
 !data/name/.gitkeep
-data/nft/*
 !data/nft/.gitkeep
 deployments/localhost
 deployments/hardhat

@@ -52,7 +52,7 @@ var (
 	// The Root Cli Handler
 	enhanceCmd = &cli.Command{
 		Use:   "enhance",
-		Short: "Enhance images in source directory. The primary command in this binary.",
+		Short: "Enhance images with FaceApp + Desktop Automation -- targeting a source directory. The primary command in this binary.",
 		Run:   EnhanceAll,
 	}
 	// Index each face to an output directory
