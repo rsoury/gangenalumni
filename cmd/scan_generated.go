@@ -28,6 +28,7 @@ var (
 func init() {
 	rootCmd.AddCommand(scanGeneratedCmd)
 
+	scanGeneratedCmd.PersistentFlags().StringP("source", "s", "./output/step1", "Path to source human images directory.")
 	scanGeneratedCmd.PersistentFlags().Int("max-queue", 20, "Maximum number of parallel images to process")
 	scanGeneratedCmd.PersistentFlags().Bool("simple", false, "Run the check simply. Only compare images immediately before and after the current source image.")
 }
