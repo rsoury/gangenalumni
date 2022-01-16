@@ -195,41 +195,48 @@ func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 
 // We have a process of resizing the search image to determine the result with the best confidence.
 func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, float32, error) {
-	searchMat, err := gocv.ImageToMatRGB(searchImg)
-	if err != nil {
-		return Coords{}, 0, err
-	}
-	defer searchMat.Close()
-
 	// Produce multiple sizes for the search image
 	var res CVResult
-	for i := 0; i <= 9; i++ {
-		resizeWidth := int(math.Round(float64(sourceImg.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
-		rImg := imaging.Resize(sourceImg, resizeWidth, 0, imaging.Lanczos)
-		// fmt.Printf("Resizing image for width %d\n", resizeWidth)
-		// q.Q(i, resizeWidth, rImg.Bounds().Dx())
-		if rImg.Bounds().Dx() <= searchImg.Bounds().Dx() || rImg.Bounds().Dy() <= searchImg.Bounds().Dy() {
-			break // Break the loop if the source image resize becomes smaller than the search image.
-		}
-		// Then process the results to determine the most common coordinate location on the sourceImg
-		srcMat, _ := gocv.ImageToMatRGB(rImg)
-		defer srcMat.Close()
-		// if debugMode {
-		// 	go func() {
-		// 		gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-resized-%d.jpg", currentTs, time.Now().Unix()), rImg)
-		// 	}()
-		// }
-		_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
+	var sourceImgResizeCache [10]*image.Image
+	for x := 0; x < 4; x++ {
+		resizeSearchWidth := int(math.Round(float64(searchImg.Bounds().Dx()) * (1.0 - float64(x)/10.0)))
+		rSearchImg := imaging.Resize(sourceImg, resizeSearchWidth, 0, imaging.Lanczos)
+		searchMat, _ := gocv.ImageToMatRGB(searchImg)
+		defer searchMat.Close()
 
-		r := CVResult{
-			Confidence:  confidence,
-			Point:       topLeftPoint,
-			SearchImage: searchImg,
-			SourceImage: rImg,
-		}
+		for i := 0; i < 10; i++ {
+			var rImg image.Image
+			if sourceImgResizeCache[i] == nil {
+				resizeWidth := int(math.Round(float64(sourceImg.Bounds().Dx()) * (1.0 - float64(i)/10.0)))
+				rImg = imaging.Resize(sourceImg, resizeWidth, 0, imaging.Lanczos)
+				sourceImgResizeCache[i] = &rImg
+			} else {
+				rImg = *sourceImgResizeCache[i]
+			}
+			// log.Printf("Resizing image for width %d\n", resizeWidth)
+			// q.Q(i, resizeWidth, rImg.Bounds().Dx())
+			if rImg.Bounds().Dx() <= rSearchImg.Bounds().Dx() || rImg.Bounds().Dy() <= rSearchImg.Bounds().Dy() {
+				// log.Printf("Source image is smaller than search image - Search: %v,%v , Source: %v,%v \n", rImg.Bounds().Dx(), rImg.Bounds().Dy(), searchImg.Bounds().Dx(), searchImg.Bounds().Dy())
+				break // Break the loop if the source image resize becomes smaller than the search image.
+			}
+			// Then process the results to determine the most common coordinate location on the sourceImg
+			srcMat, _ := gocv.ImageToMatRGB(rImg)
+			defer srcMat.Close()
+			if debugMode {
+				gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/screen-resized-%d.jpg", currentTs, i), rImg)
+			}
+			_, confidence, _, topLeftPoint := gcv.FindImgMat(searchMat, srcMat)
 
-		if r.Confidence > res.Confidence && r.Confidence > 0.5 {
-			res = r
+			r := CVResult{
+				Confidence:  confidence,
+				Point:       topLeftPoint,
+				SearchImage: searchImg,
+				SourceImage: rImg,
+			}
+
+			if r.Confidence > res.Confidence && r.Confidence > 0.5 {
+				res = r
+			}
 		}
 	}
 
