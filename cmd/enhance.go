@@ -354,7 +354,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			// 		gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/face-%d-ID-%v--editor-screen-%d.jpg", currentTs, i, imageId, count), editorScreenImg)
 			// 	}()
 			// }
-			_, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancements[0].Name, " ", "-"))), editorScreenImg)
+			_, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancements[0].Name, " ", "-"))), editorScreenImg)
 			if err != nil {
 				if count > 10 {
 					break
@@ -390,7 +390,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			if err != nil {
 				return Coords{}, fmt.Errorf("%v: %s", err, gsImagePath)
 			}
-			coords, err := bluestacks.GetImageCoordsInImage(editorHeaderImg, editorScreenImg)
+			coords, _, err := bluestacks.GetImageCoordsInImage(editorHeaderImg, editorScreenImg)
 			if err != nil {
 				return Coords{}, fmt.Errorf("%v: %s", err, imagePath)
 			}
@@ -416,7 +416,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		robotgo.MilliSleep(250)
 		editorScreenImg = robotgo.CaptureImg()
 		genderSwitchOptionCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-			return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gender-switch-female-option.png", editorScreenImg)
+			coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gender-switch-female-option.png", editorScreenImg)
+			return coords, err
 		}, "editor-gender-switch-option")
 		if err != nil {
 			log.Printf("ERROR: Cannot select gender switch option - %v\n", err.Error())
@@ -489,7 +490,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			editorScreenImg := robotgo.CaptureImg()
 			log.Printf("Image ID %v - Entering into enhancement %s ... \n", imageId, enhancement.Name)
 			eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
+				return coords, err
 			}, fmt.Sprintf("enhancement-%s", enhancement.Name))
 			if err != nil {
 				log.Printf("ERROR: Cannot select enhancement %s - %v\n", enhancement.Name, err.Error())
@@ -514,7 +516,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				log.Printf("Image ID %v - Finding scroll reference of type %s to find enhancement %s type %s ... \n", imageId, scrollReferenceEnhancementType.Name, enhancement.Name, eType.Name)
 				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-					return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
+					coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
+					return coords, err
 				}, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 				// if debugMode {
 				// 	q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
@@ -546,7 +549,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 
 			log.Printf("Image ID %v - Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
 			etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
+				return coords, err
 			}, fmt.Sprintf("enhancement-type-%s", eType.Name))
 			// if debugMode {
 			// 	q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
@@ -566,7 +570,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			bluestacks.MoveClick(etCoords.X, etCoords.Y)
 			log.Printf("Image ID %v - Enhanced using enhancement %s type %s\n", imageId, enhancement.Name, eType.Name)
 			applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
+				return coords, err
 			}, "editor-apply")
 			if err != nil {
 				log.Fatalf("ERROR: Cannot find Apply text/button - %v\n", err.Error())
@@ -590,7 +595,8 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 		if len(enhancementsApplied) > 0 {
 			editorScreenImg := robotgo.CaptureImg()
 			saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/save.png", editorScreenImg)
+				return coords, err
 			}, "editor-save")
 			if err != nil {
 				log.Fatalf("ERROR: Cannot find Save text/button - %v\n", err.Error())

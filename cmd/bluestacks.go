@@ -194,10 +194,10 @@ func (b *BlueStacks) GetCoords(x, y int, screenImg image.Image) Coords {
 }
 
 // We have a process of resizing the search image to determine the result with the best confidence.
-func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, error) {
+func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Coords, float32, error) {
 	searchMat, err := gocv.ImageToMatRGB(searchImg)
 	if err != nil {
-		return Coords{}, err
+		return Coords{}, 0, err
 	}
 	defer searchMat.Close()
 
@@ -234,24 +234,24 @@ func (b *BlueStacks) GetImageCoordsInImage(searchImg, sourceImg image.Image) (Co
 	}
 
 	if res.Confidence == 0 {
-		return Coords{}, errors.New("Cannot find image inside of source image")
+		return Coords{}, 0, errors.New("Cannot find image inside of source image")
 	}
 
 	coords := b.GetCoords(res.Point.X+res.SearchImage.Bounds().Dx()/2, res.Point.Y+res.SearchImage.Bounds().Dy()/2, res.SourceImage)
 
-	return coords, nil
+	return coords, res.Confidence, nil
 }
 
-func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image.Image) (Coords, error) {
+func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image.Image) (Coords, float32, error) {
 	searchImg, _, err := robotgo.DecodeImg(imagePath)
 	if err != nil {
-		return Coords{}, fmt.Errorf("%v: %s", err, imagePath)
+		return Coords{}, 0, fmt.Errorf("%v: %s", err, imagePath)
 	}
-	coords, err := b.GetImageCoordsInImage(searchImg, sourceImg)
+	coords, confidence, err := b.GetImageCoordsInImage(searchImg, sourceImg)
 	if err != nil {
-		return coords, fmt.Errorf("%v: %s", err, imagePath)
+		return coords, 0, fmt.Errorf("%v: %s", err, imagePath)
 	}
-	return coords, nil
+	return coords, confidence, nil
 }
 
 func (b *BlueStacks) GetCoordsWithCache(getCoords func() (Coords, error), cacheKey string) (Coords, error) {
@@ -292,15 +292,19 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 
 	var err error
 	var galleryControlCoords Coords
+	var confidence float32
 	if v, found := coordsCache["gallery"]; found {
 		galleryControlCoords = v
 	} else {
 		screenImg := robotgo.CaptureImg()
-		galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
-		if err != nil {
-			galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-2.png", screenImg)
-			if err != nil {
-				galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-3.png", screenImg)
+		galleryControlCoords, confidence, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
+		log.Printf("DEBUG: Found gallery control with gallery.png - coords: %v , confidence: %v\n", galleryControlCoords, confidence)
+		if err != nil || confidence < 0.9 {
+			galleryControlCoords, confidence, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-2.png", screenImg)
+			log.Printf("DEBUG: Found gallery control with gallery-2.png - coords: %v , confidence: %v\n", galleryControlCoords, confidence)
+			if err != nil || confidence < 0.9 {
+				galleryControlCoords, _, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-3.png", screenImg)
+				log.Printf("DEBUG: Found gallery control with gallery-3.png - coords: %v , confidence: %v\n", galleryControlCoords, confidence)
 				if err != nil {
 					return err
 				}
@@ -308,6 +312,7 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 		}
 		coordsCache["gallery"] = galleryControlCoords
 	}
+	// log.Printf("DEBUG: Scrolling to Gallery Coords %v\n", galleryControlCoords)
 	b.MoveClick(galleryControlCoords.X, galleryControlCoords.Y)
 	robotgo.MilliSleep(1000) // Wait for animation to finish
 
@@ -316,7 +321,7 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 		folderFilterControlCoords = v
 	} else {
 		screenImg := robotgo.CaptureImg()
-		folderFilterControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
+		folderFilterControlCoords, _, err = b.GetImagePathCoordsInImage("./assets/faceapp/folder-filter.png", screenImg)
 		if err != nil {
 			return err
 		}
@@ -343,7 +348,7 @@ func (b *BlueStacks) OsBackClick() error {
 		backControlCoords = v
 	} else {
 		screenImg := robotgo.CaptureImg()
-		backControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
+		backControlCoords, _, err = b.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
 		if err != nil {
 			return err
 		}
@@ -366,7 +371,8 @@ func (b *BlueStacks) ExitScreen(shouldExitModal bool) error {
 		robotgo.MilliSleep(1000)
 		exitModalScreen := robotgo.CaptureImg()
 		exitCoords, err := b.GetCoordsWithCache(func() (Coords, error) {
-			return b.GetImagePathCoordsInImage("./assets/faceapp/exit.png", exitModalScreen)
+			coords, _, err := b.GetImagePathCoordsInImage("./assets/faceapp/exit.png", exitModalScreen)
+			return coords, err
 		}, "exit")
 		if err != nil {
 			return err

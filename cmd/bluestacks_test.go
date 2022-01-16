@@ -69,7 +69,8 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 		for _, eTypePath := range eTypePaths {
 			t.Logf("Finding image path: %v\n", eTypePath)
 			coords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage(eTypePath, img)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage(eTypePath, img)
+				return coords, err
 			}, eTypePath)
 			if err != nil {
 				t.Errorf("Cannot find image inside of processing image: %v\n", err.Error())
@@ -90,13 +91,15 @@ func TestGetImagePathCoordsInImage(t *testing.T) {
 
 		if ePath == editorEnhancementTypeSelectImagePath {
 			applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage(applyImgPath, img)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage(applyImgPath, img)
+				return coords, err
 			}, "editor-apply")
 			if err != nil {
 				t.Fatal(err.Error())
 			}
 			saveCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-				return bluestacks.GetImagePathCoordsInImage(saveImgPath, img)
+				coords, _, err := bluestacks.GetImagePathCoordsInImage(saveImgPath, img)
+				return coords, err
 			}, "editor-save")
 			if err != nil {
 				t.Fatal(err.Error())
