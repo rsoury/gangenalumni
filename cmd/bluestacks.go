@@ -298,7 +298,13 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 		screenImg := robotgo.CaptureImg()
 		galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery.png", screenImg)
 		if err != nil {
-			return err
+			galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-2.png", screenImg)
+			if err != nil {
+				galleryControlCoords, err = b.GetImagePathCoordsInImage("./assets/faceapp/gallery-3.png", screenImg)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		coordsCache["gallery"] = galleryControlCoords
 	}

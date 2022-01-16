@@ -73,6 +73,7 @@ mkdirp.sync(outputDir);
 
 			const fileBuffer = await fs.readFile(image);
 			const fileBase64 = Buffer.from(fileBuffer).toString("base64");
+			console.log(fileBase64.substring(0, 30));
 			const result = await new Promise((resolve, reject) => {
 				// Note: One operation is also one reqeust. A request with multiple inputs is an operation for each input.
 				stub.PostModelOutputs(

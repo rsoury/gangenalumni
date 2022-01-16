@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"path"
 	"path/filepath"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition/types"
@@ -26,10 +28,14 @@ func init() {
 	rootCmd.AddCommand(indexCmd)
 
 	indexCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source step2 filtered images. These will be analysed and stored in a collection within AWS Rekognition for future face comparison.")
+	indexCmd.PersistentFlags().BoolP("overwrite", "o", false, "Determine whether to overwrite the existing collection's image data.")
+
+	indexCmd.MarkFlagRequired("source")
 }
 
 func Index(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
+	overwrite, _ := cmd.Flags().GetBool("overwrite")
 
 	// Setup AWS -- https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/rekognition
 	ctx := context.Background()
@@ -71,6 +77,25 @@ func Index(cmd *cli.Command, args []string) {
 			log.Fatalf("ERROR: Cannot describe the collection %s - %v\n", collectionId, err.Error())
 		}
 	}
+	// Get list of existing faces.
+	var listedFaces []types.Face
+	nextToken := ""
+	for {
+		listFacesOutput, err := awsClient.ListFaces(ctx, &rekognition.ListFacesInput{
+			CollectionId: &collectionId,
+			MaxResults:   aws.Int32(4096),
+			NextToken:    &nextToken,
+		})
+		if err != nil {
+			log.Fatalf("ERROR: Cannot list faces in collection %s - %v\n", collectionId, err.Error())
+		}
+		listedFaces = append(listedFaces, listFacesOutput.Faces...)
+		if listFacesOutput.NextToken == nil {
+			break
+		}
+		nextToken = *listFacesOutput.NextToken
+	}
+	log.Printf("%d faces found in collection\n", len(listedFaces))
 	// Index the images in the source directory.
 	for _, imagePath := range sourceImagePaths {
 		img, _, _ := robotgo.DecodeImg(imagePath)
@@ -81,6 +106,20 @@ func Index(cmd *cli.Command, args []string) {
 		filename := filepath.Base(imagePath)
 		extension := filepath.Ext(filename)
 		name := filename[0 : len(filename)-len(extension)]
+		// If not overwrite, check if name exists in listed faces. If so, continue.
+		if !overwrite {
+			shouldSkip := false
+			for _, scannedFace := range listedFaces {
+				if name == *scannedFace.ExternalImageId {
+					shouldSkip = true
+					break
+				}
+			}
+			if shouldSkip {
+				log.Printf("ID: %s skipped\n", name)
+				continue
+			}
+		}
 		output, err := awsClient.IndexFaces(ctx, &rekognition.IndexFacesInput{
 			CollectionId: &collectionId,
 			Image: &types.Image{
@@ -90,6 +129,10 @@ func Index(cmd *cli.Command, args []string) {
 		})
 		if err != nil {
 			log.Fatalf("ERROR: Cannot index the image: %v - %v", imagePath, err.Error())
+		}
+		if len(output.FaceRecords) == 0 {
+			jsonOutput, _ := json.Marshal(output)
+			log.Printf("WARN: No faces detected: %v - %v", imagePath, string(jsonOutput))
 		}
 		log.Printf("ID: %s - %d faces indexed, %d faces detected but dismissed\n", name, len(output.FaceRecords), len(output.UnindexedFaces))
 	}
