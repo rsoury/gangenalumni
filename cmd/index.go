@@ -24,6 +24,8 @@ var (
 
 func init() {
 	rootCmd.AddCommand(indexCmd)
+
+	indexCmd.PersistentFlags().StringP("source", "s", "./output/step2", "Path to source step2 filtered images. These will be analysed and stored in a collection within AWS Rekognition for future face comparison.")
 }
 
 func Index(cmd *cli.Command, args []string) {
@@ -40,7 +42,7 @@ func Index(cmd *cli.Command, args []string) {
 	awsClient := rekognition.NewFromConfig(awsNativeConfig)
 
 	// Setup Source Image Paths - Fetch all the image paths from the source directory
-	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*.{jpeg,jpg,png}"))
+	sourceImagePaths, err := filepath.Glob(path.Join(sourceDir, "/*.jpeg"))
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}

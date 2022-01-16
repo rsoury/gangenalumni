@@ -100,7 +100,9 @@ mkdirp.sync(outputDir);
 									"\n" +
 									response.status.details
 							);
-							return reject(new Error(response.status.description));
+							return reject(
+								new Error(JSON.stringify({ id: name, error: response.status }))
+							);
 						}
 
 						debugLog("Predicted concepts, with confidence values:");
@@ -130,7 +132,7 @@ mkdirp.sync(outputDir);
 
 	q.on("task_failed", (taskId, err) => {
 		console.log(chalk.red(`[${taskId}] Could not process image`));
-		console.error(inspectObject(err));
+		console.error("Received failed status: ", err.message);
 	});
 
 	q.on("task_finish", (taskId, result) => {

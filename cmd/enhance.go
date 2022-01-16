@@ -266,7 +266,11 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 				matchedFace = match
 			}
 		}
-		if matchedFace.Similarity == nil {
+		isFaceMatched := matchedFace.Similarity != nil
+		if isFaceMatched {
+			isFaceMatched = *matchedFace.Similarity > 0.85
+		}
+		if !isFaceMatched {
 			log.Printf("ERROR: No face matched for pre-enhanced detected image - %d-%dx%d\n", i, faceCoords.X, faceCoords.Y)
 			err = bluestacks.OsBackClick() // Exit back to Home screen from the Gallery
 			if err != nil {
