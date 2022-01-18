@@ -108,7 +108,7 @@ func (b *BlueStacks) LoadFaceClassifier(cascadeFile string) error {
 
 func (b *BlueStacks) MoveClick(x, y int) {
 	robotgo.Move(x, y)
-	robotgo.MilliSleep(100)
+	robotgo.MilliSleep(200)
 	robotgo.Click()
 }
 

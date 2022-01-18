@@ -470,9 +470,12 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 			if !applyEnhancement {
 				continue
 			}
-			if len(eType.Name) == 0 {
-				// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
-				enhancementTypes := enhancement.ShuffleTypes()
+			// Select the type of enhancement -- // First, Clone and shuffle the enhacements types
+			enhancementTypes := enhancement.ShuffleTypes()
+			for {
+				if len(eType.Name) != 0 {
+					break
+				}
 				for typeIndex := 0; typeIndex < len(enhancementTypes); typeIndex++ {
 					if rand.Float64() <= enhancementTypes[typeIndex].Probability {
 						eType = enhancementTypes[typeIndex]
