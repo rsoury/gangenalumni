@@ -106,7 +106,6 @@ contract NFT is ERC1155Tradable {
 	function publicMint(uint256 count) public payable {
 		require(msg.value == _price * count, "NFT: invalid value");
 		require(count > 0, "NFT: mint amount must be greater than 0");
-		require(count <= 100, "NFT: public mint amount must be less than 100");
 		address initialOwner = _msgSender();
 		if (count > 1) {
 			// Batch Mint
