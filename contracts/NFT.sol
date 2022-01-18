@@ -35,10 +35,6 @@ contract NFT is ERC1155Tradable {
 		_contractURI = newuri;
 	}
 
-	function updatePrice(uint256 newPrice) public onlyOwner {
-		_price = newPrice;
-	}
-
 	/**
 	 * @dev Mint a new token type and assigns _initialSupply to an address
 	 * @param initialOwner address of the first owner of the token
@@ -110,6 +106,7 @@ contract NFT is ERC1155Tradable {
 	function publicMint(uint256 count) public payable {
 		require(msg.value == _price * count, "NFT: invalid value");
 		require(count > 0, "NFT: mint amount must be greater than 0");
+		require(count <= 100, "NFT: public mint amount must be less than 100");
 		address initialOwner = _msgSender();
 		if (count > 1) {
 			// Batch Mint
