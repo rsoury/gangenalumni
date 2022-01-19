@@ -25,7 +25,7 @@ describe("NFT Smart Contract Tests", () => {
 		);
 	});
 
-	it("NFT token is minted successfully", async () => {
+	it("Token is minted successfully", async () => {
 		const [owner] = await ethers.getSigners();
 		expect(await nft.balanceOf(owner.address, 1)).to.equal(0);
 
@@ -33,9 +33,13 @@ describe("NFT Smart Contract Tests", () => {
 		expect(await nft.balanceOf(owner.address, 1)).to.equal(1);
 	});
 
-	it("NFT errors on out of bounds token", async () => {
+	it("Contract errors on out of bounds token", async () => {
 		const [owner] = await ethers.getSigners();
 		await expectThrow(nft.connect(owner).mint(owner.address, 10001, "", []));
+	});
+
+	it("Token is publicly minted successfully", async () => {
+		/// ...
 	});
 
 	it("Token/Contract URI is set sucessfully", async () => {
@@ -110,6 +114,8 @@ describe("NFT Smart Contract Tests", () => {
 			});
 		});
 	});
+
+	it("Token public/payment-based batch mint successful", async () => {});
 
 	it("Token permanence event emits successfully", async () => {
 		const [owner] = await ethers.getSigners();
