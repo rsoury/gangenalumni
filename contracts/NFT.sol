@@ -50,6 +50,7 @@ contract NFT is ERC1155Tradable {
 		bytes memory data
 	) public onlyOwner returns (uint256) {
 		require(!_exists(id), "token id already exists");
+		require(id > 0 && id <= MAX_TOKEN_COUNT, "token id out of bounds");
 
 		if (bytes(uri).length > 0) {
 			customUri[id] = uri;
@@ -87,6 +88,10 @@ contract NFT is ERC1155Tradable {
 			for (uint256 j = 0; j < ids.length; j++) {
 				uint256 id = ids[j];
 				require(!_exists(id), "token id already exists");
+				require(
+					id > 0 && id <= MAX_TOKEN_COUNT,
+					"token id out of bounds"
+				);
 				tokenSupply[id] = 1;
 				quantities[j] = 1;
 
@@ -154,11 +159,11 @@ contract NFT is ERC1155Tradable {
 			uint256[] memory ids = idsPerRecipient[i];
 			uint256[] memory quantities = new uint256[](ids.length);
 			for (uint256 j = 0; j < ids.length; j++) {
-				uint256 quantity = super.balanceOf(from, ids[j]);
+				uint256 quantity = balanceOf(from, ids[j]);
 				quantities[j] = quantity;
 			}
 			bytes memory data = "";
-			super.safeBatchTransferFrom(from, recipient, ids, quantities, data);
+			safeBatchTransferFrom(from, recipient, ids, quantities, data);
 		}
 	}
 

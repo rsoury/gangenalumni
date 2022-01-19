@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const expectThrow = require("./helpers/expect-throw");
 
 let nft;
 const tokenURI =
@@ -30,6 +31,11 @@ describe("NFT Smart Contract Tests", () => {
 
 		await nft.connect(owner).mint(owner.address, 1, "", []);
 		expect(await nft.balanceOf(owner.address, 1)).to.equal(1);
+	});
+
+	it("NFT errors on out of bounds token", async () => {
+		const [owner] = await ethers.getSigners();
+		await expectThrow(nft.connect(owner).mint(owner.address, 10001, "", []));
 	});
 
 	it("Token/Contract URI is set sucessfully", async () => {
