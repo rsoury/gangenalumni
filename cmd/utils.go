@@ -78,3 +78,10 @@ func imagesSimilar(imgA, imgB image.Image) bool {
 	hashB, imgSizeB := images.Hash(imgB)
 	return images.Similar(hashA, hashB, imgSizeA, imgSizeB)
 }
+
+func getFileName(pathToFile string) string {
+	filename := filepath.Base(pathToFile)
+	extension := filepath.Ext(filename)
+	name := filename[0 : len(filename)-len(extension)]
+	return name
+}

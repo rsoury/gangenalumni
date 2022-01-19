@@ -1,4 +1,4 @@
-task("batch-create", "Batch create NFT tokens to addresses")
+task("batch-mint", "Batch mint NFT tokens to addresses")
 	.addOptionalParam(
 		"file",
 		"Path to CSV File indicating which TokenIDs to are to created for each recipient Address. Either provide a file or input."
@@ -45,10 +45,11 @@ task("batch-create", "Batch create NFT tokens to addresses")
 		}
 
 		const [owner] = await ethers.getSigners();
-		const tx = await nft.connect(owner).batchCreate(
+		const tx = await nft.connect(owner).batchMint(
 			recipients.map(({ address }) => address),
 			recipients.map(({ ids }) => ids),
-			customUri
+			customUri,
+			""
 		);
 		console.log(`Transaction created: ${tx.hash}\n`);
 		await tx.wait();

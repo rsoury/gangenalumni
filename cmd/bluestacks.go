@@ -289,7 +289,8 @@ func (b *BlueStacks) DetectFaces(img image.Image, validity int) []image.Rectangl
 
 // Some Screen Movement Functions
 func (b *BlueStacks) MoveToSharedFolderFromHome() error {
-	b.ScrollUp(50) // Scroll up to ensure that gallery button shows.
+	// b.ScrollUp(50) // Scroll up to ensure that gallery button shows.
+	// No longer required at the Gallery control shows always in FaceApp 10.1+
 
 	var err error
 	var galleryControlCoords Coords
@@ -385,4 +386,24 @@ func (b *BlueStacks) ExitScreen(shouldExitModal bool) error {
 	}
 
 	return nil
+}
+
+func (b *BlueStacks) WaitForElement(assetTemplatePath string, waitFor int, maxCount int) bool {
+	count := 0
+	isAvailable := false
+	for {
+		count++
+		robotgo.MilliSleep(2000)
+		currentScreen := robotgo.CaptureImg()
+		_, _, err := b.GetImagePathCoordsInImage("./assets/faceapp/filepicker-indicator.png", currentScreen)
+		if err != nil {
+			if count > maxCount {
+				break
+			}
+			continue
+		}
+		isAvailable = true
+		break
+	}
+	return isAvailable
 }
