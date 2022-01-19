@@ -25,7 +25,6 @@ const options = require("../utils/options")((program) => {
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
 	);
 });
-const { inspectObject } = require("../utils");
 
 const { CLARIFAI_API_KEY } = process.env;
 

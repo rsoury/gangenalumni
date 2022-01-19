@@ -108,7 +108,7 @@ func (b *BlueStacks) LoadFaceClassifier(cascadeFile string) error {
 
 func (b *BlueStacks) MoveClick(x, y int) {
 	robotgo.Move(x, y)
-	robotgo.MilliSleep(200)
+	robotgo.MilliSleep(300)
 	robotgo.Click()
 }
 
@@ -343,21 +343,23 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 }
 
 func (b *BlueStacks) OsBackClick() error {
-	var err error
-	var backControlCoords Coords
-	if v, found := coordsCache["osback"]; found {
-		backControlCoords = v
-	} else {
-		screenImg := robotgo.CaptureImg()
-		backControlCoords, _, err = b.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
-		if err != nil {
-			return err
-		}
-		coordsCache["osback"] = backControlCoords
-	}
+	// var err error
+	// var backControlCoords Coords
+	// if v, found := coordsCache["osback"]; found {
+	// 	backControlCoords = v
+	// } else {
+	// 	screenImg := robotgo.CaptureImg()
+	// 	backControlCoords, _, err = b.GetImagePathCoordsInImage("./assets/faceapp/os-back.png", screenImg)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	coordsCache["osback"] = backControlCoords
+	// }
 
-	b.MoveClick(backControlCoords.X, backControlCoords.Y)
-	robotgo.MilliSleep(1000)
+	// b.MoveClick(backControlCoords.X, backControlCoords.Y)
+	// robotgo.MilliSleep(1000)
+
+	robotgo.KeyTap("esc")
 
 	return nil
 }

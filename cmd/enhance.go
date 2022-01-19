@@ -655,6 +655,7 @@ func EnhanceAll(cmd *cli.Command, args []string) {
 					if err != nil {
 						log.Fatal("ERROR: ", err.Error())
 					}
+					continue
 				} else {
 					log.Printf("[Face %v] Using average cached Detected Enhanced Face Coordinates - with index: %d\n", imageId, i)
 					// Determine total rect from previously detected post-save faces
