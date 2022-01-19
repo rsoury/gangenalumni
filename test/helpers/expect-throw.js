@@ -1,15 +1,11 @@
 const { assert } = require("chai");
 
-const expectThrow = async (promise) => {
+const expectThrow = async (promise, expectedErrorMessage) => {
 	try {
 		await promise;
 	} catch (error) {
-		const invalidJump = error.message.search("invalid JUMP") >= 0;
-		const outOfGas = error.message.search("out of gas") >= 0;
-		const tokenIdOutOfBounds =
-			error.message.search("token id out of bounds") >= 0;
 		assert(
-			invalidJump || outOfGas || tokenIdOutOfBounds,
+			error.message.search(expectedErrorMessage) >= 0,
 			"Expected throw, got '" + error + "' instead"
 		);
 		return;

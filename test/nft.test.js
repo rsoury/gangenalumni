@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const _ = require("lodash");
 const expectThrow = require("./helpers/expect-throw");
 
 let nft;
@@ -35,11 +36,32 @@ describe("NFT Smart Contract Tests", () => {
 
 	it("Contract errors on out of bounds token", async () => {
 		const [owner] = await ethers.getSigners();
-		await expectThrow(nft.connect(owner).mint(owner.address, 10001, "", []));
+		await expectThrow(
+			nft.connect(owner).mint(owner.address, 10001, "", []),
+			"token id out of bounds"
+		);
 	});
 
 	it("Token is publicly minted successfully", async () => {
-		/// ...
+		const [, account] = await ethers.getSigners();
+		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
+
+		const overrides = {
+			value: ethers.utils.parseEther("0.1")
+		};
+		await nft.connect(account).publicMint(1, overrides);
+		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
+	});
+
+	it("Token throws error for publicly mint insufficient funds", async () => {
+		const [, account] = await ethers.getSigners();
+		const overrides = {
+			value: ethers.utils.parseEther("0.01")
+		};
+		await expectThrow(
+			nft.connect(account).publicMint(1, overrides),
+			"invalid value"
+		);
 	});
 
 	it("Token/Contract URI is set sucessfully", async () => {
@@ -115,7 +137,86 @@ describe("NFT Smart Contract Tests", () => {
 		});
 	});
 
-	it("Token public/payment-based batch mint successful", async () => {});
+	it("Token public/payment-based batch mint successful", async () => {
+		const [, account] = await ethers.getSigners();
+		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
+
+		const overrides = {
+			value: ethers.utils.parseEther("1")
+		};
+		const tx = await nft.connect(account).publicMint(10, overrides);
+		const events = await nft.queryFilter("TransferBatch");
+		const event = events.find(
+			({ args, transactionHash }) =>
+				args.to === account.address && transactionHash === tx.hash
+		);
+		const { ids } = event.args;
+		const balances = await Promise.all(
+			ids.map((id) => {
+				return nft.balanceOf(account.address, id);
+			})
+		);
+		balances.forEach((balance) => {
+			expect(balance).to.equal(1);
+		});
+
+		const supply = await nft.totalSupply(2);
+		expect(supply.toNumber()).to.equal(1);
+	});
+
+	it("Token public/payment-based batch mint throws error for insufficient funds", async () => {
+		const [, account] = await ethers.getSigners();
+		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
+
+		const overrides = {
+			value: ethers.utils.parseEther("0.1")
+		};
+		await expectThrow(
+			nft.connect(account).publicMint(10, overrides),
+			"invalid value"
+		);
+	});
+
+	// it("Token public/payment-based batch mint throws error for 'no more tokens'", async function () {
+	// 	this.timeout(60000);
+	// 	const [owner, , account] = await ethers.getSigners();
+	// 	expect(await nft.balanceOf(account.address, 1)).to.equal(0);
+
+	// 	const promises = _.range(20).map((index) => {
+	// 		return nft.connect(owner).batchMint(
+	// 			[owner.address],
+	// 			// [_.range(index * 1000 + 1, index * 1000 + 1000)],
+	// 			[_.range(index * 500 + 1, index * 500 + 500)],
+	// 			"",
+	// 			[],
+	// 			{
+	// 				gasLimit: 30000000
+	// 			}
+	// 		);
+	// 	});
+	// 	for (let i = 0; i < promises.length; i += 1) {
+	// 		await promises[i];
+	// 	}
+
+	// 	// const events = await nft.queryFilter("TransferBatch");
+	// 	// const totalTokenCount = events.reduce((acc, currentValue) => {
+	// 	// 	acc += currentValue.args.ids.length;
+	// 	// 	return acc;
+	// 	// }, 0);
+	// 	// console.log(events.length);
+	// 	// console.log(totalTokenCount);
+	// 	// const supply = await nft.totalSupply(10000);
+	// 	// console.log(supply.toNumber());
+
+	// 	const overrides = {
+	// 		value: ethers.utils.parseEther(`${0.1 * 21}`),
+	// 		gasLimit: 30000000
+	// 	};
+	// 	await expectThrow(
+	// 		nft.connect(account).publicMint(21, overrides),
+	// 		"no more tokens"
+	// 	);
+	// });
 
 	it("Token permanence event emits successfully", async () => {
 		const [owner] = await ethers.getSigners();
@@ -145,5 +246,11 @@ describe("NFT Smart Contract Tests", () => {
 			);
 		}
 		await Promise.all(batchPermanentPromises);
+	});
+
+	it("Withdrawal executes successfully", async () => {
+		const [owner] = await ethers.getSigners();
+		const tx = await nft.connect(owner).withdraw(owner.address);
+		expect(tx.hash).to.be.a("string");
 	});
 });

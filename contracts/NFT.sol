@@ -117,8 +117,8 @@ contract NFT is ERC1155Tradable {
 			uint256[] memory ids = new uint256[](count);
 			uint256[] memory quantities = new uint256[](count);
 			for (uint256 i = 0; i < count; i++) {
-				uint256 id = nextAvailableToken(i);
-				require(id > 0, "no more tokens available to publicly mint");
+				uint256 id = nextAvailableToken(); // No need to pass offset because setting totalSupply in the loop will prevent the same token return.
+				require(id > 0, "no more tokens");
 				require(!_exists(id), "token id already exists");
 				ids[i] = id;
 				quantities[i] = 1;
@@ -128,7 +128,7 @@ contract NFT is ERC1155Tradable {
 		} else {
 			// Single Mint
 			uint256 id = nextAvailableToken();
-			require(id > 0, "no more tokens available to publicly mint");
+			require(id > 0, "no more tokens");
 			require(!_exists(id), "token id already exists");
 
 			_mint(initialOwner, id, 1, "");
