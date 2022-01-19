@@ -36,7 +36,7 @@ import (
 var (
 	// The Root Cli Handler
 	enhanceV2Cmd = &cli.Command{
-		Use:   "enhance",
+		Use:   "enhance-v2",
 		Short: "Enhance images with FaceApp + Desktop Automation -- Enhances by importing images in source directory and processing one at a time.",
 		Run:   EnhanceV2,
 	}
@@ -57,10 +57,29 @@ func init() {
 func EnhanceV2(cmd *cli.Command, args []string) {
 	var err error
 
+	debugMode, _ = cmd.Flags().GetBool("debug")
 	cascadeFile, _ := cmd.Flags().GetString("cascade-file")
 	outputParentDir, _ := cmd.Flags().GetString("output")
 	sourceDir, _ := cmd.Flags().GetString("source")
 	facedataDir, _ := cmd.Flags().GetString("facedata")
+	maxIterations, _ := cmd.Flags().GetInt("max-iterations")
+	if debugMode {
+		err = os.MkdirAll(fmt.Sprintf("./tmp/enhance-debug/%d", currentTs), 0755) // Create tmp dir for this debug dump
+		if err != nil {
+			log.Fatalln("ERROR:", err)
+		}
+		log.Println("Start enhancement in debug mode...")
+
+		// Modify enhancements in Debug Mode to have all items with max probability
+		for i := 0; i < len(enhancements); i++ {
+			enhancements[i].Probability = 1
+			for j := 0; j < len(enhancements[i].Types); j++ {
+				enhancements[i].Types[j].Probability = 1
+			}
+		}
+	} else {
+		log.Println("Start enhancement...")
+	}
 
 	// Create output directory
 	currentTsStr := strconv.FormatInt(currentTs, 10)
@@ -85,6 +104,8 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 	}
 	defer bluestacks.FaceClassifier.Close()
 
+	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
+
 	// Start from the Home Screen
 	// 1. Iterate over each image in Source Dir
 	// 2. For each image, open Media Manage, wait for File Picker, use Shift+Cmd+g to navigate to the target file and use "Enter" to open
@@ -100,24 +121,41 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		log.Fatal("ERROR: ", err.Error())
 	}
 	screenImg := robotgo.CaptureImg()
+	if debugMode {
+		go func() {
+			gcv.ImgWrite(fmt.Sprintf("./tmp/enhance-debug/%d/home-screen.jpg", currentTs), screenImg)
+		}()
+	}
 	mediaManagerAppCoords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/media-manager-app-control.png", screenImg)
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
 	closeMediaManager := func() {
+		currentScreen := robotgo.CaptureImg()
 		mediaManagerTabImagePath := "./assets/faceapp/media-manager-tab-control.png"
-		mediaManagerTabCoords, _, err := bluestacks.GetImagePathCoordsInImage(mediaManagerTabImagePath, screenImg)
+		mediaManagerTabCloseCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+			mediaManagerTabCoords, _, err := bluestacks.GetImagePathCoordsInImage(mediaManagerTabImagePath, currentScreen)
+			mediaManagerTabImg, _, _ := imgo.DecodeFile(mediaManagerTabImagePath)
+			widthRatio := float64(mediaManagerTabImg.Bounds().Max.X) / float64(currentScreen.Bounds().Max.X)
+			relativeWidth := float64(bluestacks.ScreenWidth) * float64(widthRatio)
+			coords := Coords{
+				X: int(math.Round(float64(mediaManagerTabCoords.X) + (relativeWidth / 2))),
+				Y: mediaManagerTabCoords.Y,
+			}
+			return coords, err
+		}, "media-tab")
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
-		currentScreen := robotgo.CaptureImg()
-		mediaManagerTabImg, _, _ := imgo.DecodeFile(mediaManagerTabImagePath)
-		widthRatio := float64(mediaManagerTabImg.Bounds().Max.X) / float64(currentScreen.Bounds().Max.X)
-		relativeWidth := float64(bluestacks.ScreenWidth) * float64(widthRatio)
-		bluestacks.MoveClick(int(math.Round(float64(mediaManagerTabCoords.X)+(relativeWidth/2))), mediaManagerTabCoords.Y)
+		bluestacks.MoveClick(mediaManagerTabCloseCoords.X, mediaManagerTabCloseCoords.Y)
 	}
 	var detectedEnhancedFaces []image.Rectangle // Cache of faces saved in post-save screen
-	for _, imagePath := range imagePaths {
+	for i, imagePath := range imagePaths {
+		if maxIterations > 0 {
+			if i > maxIterations-1 {
+				break
+			}
+		}
 		imageId := getFileName(imagePath)
 
 		log.Printf("[Face %v] Running checks...", imageId)
@@ -181,10 +219,14 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 		// Open Path finder in FilePicker
 		robotgo.KeyTap("g", "shift", "cmd")
+		robotgo.MilliSleep(1000)
 		// Insert path to string
-		robotgo.TypeStr(imagePath)
+		absPath, _ := filepath.Abs(imagePath)
+		bluestacks.TypeStr(absPath)
+		robotgo.MilliSleep(500)
 		// Show file
 		robotgo.KeyTap("enter")
+		robotgo.MilliSleep(500)
 		// Open file
 		robotgo.KeyTap("enter")
 
@@ -204,11 +246,15 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
+		bluestacks.MoveClick(int(math.Round(float64(bluestacks.ScreenWidth)/2)), int(math.Round(float64(bluestacks.ScreenHeight)/2)))
+		robotgo.MilliSleep(100)
 		bluestacks.MoveClick(faTabCoords.X, faTabCoords.Y)
 		robotgo.MilliSleep(200)
 		robotgo.Click()
 		robotgo.MilliSleep(200)
 		robotgo.Click()
+
+		robotgo.MilliSleep(1000) // In case there is a Splash Screen
 
 		// Move the SharedFolder -- recently imported doesn't always show first on the home screen
 		err = bluestacks.MoveToSharedFolderFromHome()
@@ -585,6 +631,9 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		})
 
 		// Use the back button to return to the Home Screen -- Exit the Editor Screen.
+		_ = bluestacks.OsBackClick()
+
+		// Hit the Back Button again to reach the Bluestacks Home Screen
 		err = bluestacks.OsBackClick()
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())

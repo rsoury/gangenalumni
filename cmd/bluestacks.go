@@ -112,6 +112,13 @@ func (b *BlueStacks) MoveClick(x, y int) {
 	robotgo.Click()
 }
 
+func (b *BlueStacks) TypeStr(str string) {
+	for _, char := range str {
+		// robotgo.MilliSleep(20)
+		robotgo.KeyTap(string(char))
+	}
+}
+
 func (b *BlueStacks) scroll(scrollBy int) {
 	robotgo.Move(b.CenterCoords.X, b.CenterCoords.Y)
 	robotgo.MilliSleep(100)
@@ -334,7 +341,7 @@ func (b *BlueStacks) MoveToSharedFolderFromHome() error {
 
 	//* Opting for a Hotkey approach to minimise room for error
 	robotgo.KeyTap("down")
-	robotgo.KeyTap("down")
+	// robotgo.KeyTap("down") // Leave one out ... as the new FaceApp orders SharedFolder before FaceApp folder.
 	robotgo.KeyTap("down")
 	robotgo.KeyTap("enter")
 	robotgo.KeyTap("tab")
