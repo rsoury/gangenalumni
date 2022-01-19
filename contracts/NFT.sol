@@ -85,10 +85,10 @@ contract NFT is ERC1155Tradable {
 			uint256[] memory ids = idsPerOwner[i];
 			uint256[] memory quantities = new uint256[](ids.length); // https://fravoll.github.io/solidity-patterns/memory_array_building.html
 			for (uint256 j = 0; j < ids.length; j++) {
-				uint256 id = ids[i];
+				uint256 id = ids[j];
 				require(!_exists(id), "token id already exists");
 				tokenSupply[id] = 1;
-				quantities[i] = 1;
+				quantities[j] = 1;
 
 				if (bytes(uri).length > 0) {
 					customUri[id] = uri;
