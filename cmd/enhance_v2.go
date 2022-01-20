@@ -552,14 +552,14 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 					isSaved = true
 					break
 				}
-				if saveCount > 4 {
-					// Try 5 times
+				if saveCount > 5 {
 					break
 				}
 			}
 			if !isSaved {
 				log.Printf("[Face %v] WARN: Failed to Save.\n", imageId)
-				err = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
+				_ = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
+				err = bluestacks.OsBackClick()                          // Exit to the BS Home Screen
 				if err != nil {
 					log.Fatalf("[Face %v] ERROR: %v", imageId, err.Error())
 				}
@@ -578,9 +578,12 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				}
 				if len(detectedEnhancedFaces) == 0 {
 					log.Printf("ERROR: [Face %v] No cached Detected Enhanced Face Coordinates to use...\n", imageId)
-					// Use the back button to return to the Home Screen -- Exit the Save Screen and then Editor Screen
-					_ = bluestacks.OsBackClick()
-					err = bluestacks.OsBackClick()
+					// Use the back button to return to the BS Home Screen
+					_ = bluestacks.OsBackClick() // Exit the Save Screen
+					robotgo.MilliSleep(100)
+					_ = bluestacks.OsBackClick() // and then Editor Screen
+					robotgo.MilliSleep(100)
+					err = bluestacks.OsBackClick() // and then FaceApp
 					if err != nil {
 						log.Fatalf("[Face %v] ERROR: %v", imageId, err.Error())
 					}
