@@ -6,7 +6,7 @@ const expectThrow = async (promise, expectedErrorMessage) => {
 	} catch (error) {
 		assert(
 			error.message.search(expectedErrorMessage) >= 0,
-			"Expected throw, got '" + error + "' instead"
+			`Expected throw '${expectedErrorMessage}', got '${error}' instead`
 		);
 		return;
 	}

@@ -177,46 +177,74 @@ describe("NFT Smart Contract Tests", () => {
 		);
 	});
 
-	// it("Token public/payment-based batch mint throws error for 'no more tokens'", async function () {
-	// 	this.timeout(60000);
-	// 	const [owner, , account] = await ethers.getSigners();
-	// 	expect(await nft.balanceOf(account.address, 1)).to.equal(0);
+	it("Token public/payment-based batch mint throws error for 'no more tokens'", async function () {
+		this.timeout(60000);
+		const [owner, , account] = await ethers.getSigners();
+		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
 
-	// 	const promises = _.range(20).map((index) => {
-	// 		return nft.connect(owner).batchMint(
-	// 			[owner.address],
-	// 			// [_.range(index * 1000 + 1, index * 1000 + 1000)],
-	// 			[_.range(index * 500 + 1, index * 500 + 500)],
-	// 			"",
-	// 			[],
-	// 			{
-	// 				gasLimit: 30000000
-	// 			}
-	// 		);
-	// 	});
-	// 	for (let i = 0; i < promises.length; i += 1) {
-	// 		await promises[i];
-	// 	}
+		const promises = _.range(20).map((index) => {
+			return nft.connect(owner).batchMint(
+				[owner.address],
+				// [_.range(index * 1000 + 1, index * 1000 + 1000)],
+				[_.range(index * 500 + 1, index * 500 + 501)], // _.range(1, 501) = [1...500] -- second parameter is the number of elements, rather than the end element.
+				"",
+				[],
+				{
+					gasLimit: 30000000
+				}
+			);
+		});
+		// const txs = [];
+		for (let i = 0; i < promises.length; i += 1) {
+			// const tx = await promises[i];
+			// txs.push(tx);
+			await promises[i];
+		}
 
-	// 	// const events = await nft.queryFilter("TransferBatch");
-	// 	// const totalTokenCount = events.reduce((acc, currentValue) => {
-	// 	// 	acc += currentValue.args.ids.length;
-	// 	// 	return acc;
-	// 	// }, 0);
-	// 	// console.log(events.length);
-	// 	// console.log(totalTokenCount);
-	// 	// const supply = await nft.totalSupply(10000);
-	// 	// console.log(supply.toNumber());
+		// const events = await nft.queryFilter("TransferBatch");
+		// const supply = await nft.totalSupply(10000);
+		// console.log(events[events.length - 1].args.ids);
+		// console.log({
+		// 	numOfEvents: events.length,
+		// 	supply10000: supply.toNumber(),
+		// 	totalTokenCount: events.reduce((acc, currentValue) => {
+		// 		acc += currentValue.args.ids.length;
+		// 		return acc;
+		// 	}, 0),
+		// 	txsIdSum: events.reduce((a, event) => {
+		// 		a += event.args.ids.reduce((idA, id) => {
+		// 			idA += id.toNumber();
+		// 			return idA;
+		// 		}, 0);
+		// 		return a;
+		// 	}, 0),
+		// 	totalIdSum: _.range(1, 10000).reduce((a, c) => {
+		// 		a += c;
+		// 		return a;
+		// 	}, 0)
+		// });
+		// // Collect all ids from event into a single array, then check which are missing.
+		// const eventIds = events.reduce((a, event) => {
+		// 	a = [...a, ...event.args.ids.map((id) => id.toNumber())];
+		// 	return a;
+		// }, []);
+		// const missing = [];
+		// _.range(1, 10000).forEach((id) => {
+		// 	if (!eventIds.includes(id)) {
+		// 		missing.push(id);
+		// 	}
+		// });
+		// console.log({ missing });
 
-	// 	const overrides = {
-	// 		value: ethers.utils.parseEther(`${0.1 * 21}`),
-	// 		gasLimit: 30000000
-	// 	};
-	// 	await expectThrow(
-	// 		nft.connect(account).publicMint(21, overrides),
-	// 		"no more tokens"
-	// 	);
-	// });
+		const overrides = {
+			value: ethers.utils.parseEther("0.1"), // (`${0.1 * 21}`),
+			gasLimit: 30000000
+		};
+		await expectThrow(
+			nft.connect(account).publicMint(1, overrides),
+			"no more tokens"
+		);
+	});
 
 	it("Token permanence event emits successfully", async () => {
 		const [owner] = await ethers.getSigners();

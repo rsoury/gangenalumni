@@ -6,7 +6,6 @@ import (
 	"image"
 	"log"
 	"math"
-	"strings"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-vgo/robotgo"
@@ -256,16 +255,6 @@ func (b *BlueStacks) GetImagePathCoordsInImage(imagePath string, sourceImg image
 	if err != nil {
 		return Coords{}, 0, fmt.Errorf("%v: %s", err, imagePath)
 	}
-
-	log.Printf("Search img width before %v", searchImg.Bounds().Max.X)
-	if strings.Contains(imagePath, "faceapp") {
-		defaultScreenWidth := 1720
-		if b.ScreenWidth != defaultScreenWidth {
-			resizeWidth := int(math.Round(float64(b.ScreenWidth) / float64(defaultScreenWidth) * float64(searchImg.Bounds().Max.X)))
-			searchImg = imaging.Resize(searchImg, resizeWidth, 0, imaging.Lanczos)
-		}
-	}
-	log.Printf("Search img width after %v", searchImg.Bounds().Max.X)
 
 	coords, confidence, err := b.GetImageCoordsInImage(searchImg, sourceImg)
 	if err != nil {

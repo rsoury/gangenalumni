@@ -49,7 +49,7 @@ task("batch-mint", "Batch mint NFT tokens to addresses")
 			recipients.map(({ address }) => address),
 			recipients.map(({ ids }) => ids),
 			customUri,
-			""
+			[]
 		);
 		console.log(`Transaction created: ${tx.hash}\n`);
 		await tx.wait();
