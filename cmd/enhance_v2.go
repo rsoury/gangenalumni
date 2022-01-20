@@ -100,6 +100,8 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 	// Setup Bluestacks
 	bluestacks := NewBlueStacks()
 
+	log.Printf("Screen size %v x %v", bluestacks.ScreenWidth, bluestacks.ScreenHeight)
+
 	err = bluestacks.LoadFaceClassifier(cascadeFile)
 	if err != nil {
 		log.Fatalf("ERROR: %v", err.Error())

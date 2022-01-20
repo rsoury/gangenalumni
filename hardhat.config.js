@@ -56,6 +56,10 @@ module.exports = {
 			url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
 			accounts: [OWNER_PRIVATE_KEY]
 			// chainId: chainIds.rinkeby
+		},
+		mainnet: {
+			url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+			accounts: [OWNER_PRIVATE_KEY]
 		}
 		// coverage: {
 		// 	url: "http://127.0.0.1:8555"
