@@ -163,7 +163,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		}
 		imageId := getFileName(imagePath)
 
-		log.Printf("[Face %v] Running checks...", imageId)
+		log.Printf("[Index %v Face %v] Running checks...", i, imageId)
 
 		// Check if the face has already been enhanced
 		alreadyEnhanced := false
@@ -176,7 +176,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 		// Continue with the next iteration if this face has already been enhanced.
 		if alreadyEnhanced {
-			log.Printf("[Face %v] Image has already been enhanced", imageId)
+			log.Printf("[Index %v Face %v] Image has already been enhanced", i, imageId)
 			continue
 		}
 
@@ -199,7 +199,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			continue
 		}
 
-		log.Printf("[Face %v] Importing image ...", imageId)
+		log.Printf("[Index %v Face %v] Importing image ...", i, imageId)
 
 		bluestacks.MoveClick(mediaManagerAppCoords.X, mediaManagerAppCoords.Y)
 		robotgo.MilliSleep(500)
@@ -216,7 +216,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		// 4. Wait for the filepicker to show
 		isFilePickerAvailable := bluestacks.WaitForElement("./assets/faceapp/filepicker-indicator.png", 2000, 10)
 		if !isFilePickerAvailable {
-			log.Printf("WARN: [Face %v] File picker not showing...\n", imageId)
+			log.Printf("WARN: [Index %v Face %v] File picker not showing...\n", i, imageId)
 			// Close Media Manager
 			closeMediaManager()
 			continue
@@ -239,25 +239,23 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 		// Close Media Manager
 		closeMediaManager()
-		log.Printf("[Face %v] Image imported!\n", imageId)
+		log.Printf("[Index %v Face %v] Image imported!\n", i, imageId)
+
+		robotgo.MilliSleep(500)
 
 		// Open Face App
-		log.Printf("[Face %v] Processing image ...", imageId)
+		log.Printf("[Index %v Face %v] Processing image ...", i, imageId)
 		currentScreen := robotgo.CaptureImg()
-		faTabCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
-			coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/faceapp-tab-control.png", currentScreen)
+		faAppCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
+			coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/faceapp-app-control.png", currentScreen)
 			return coords, err
 		}, "faceapp-tab")
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
-		bluestacks.MoveClick(int(math.Round(float64(bluestacks.ScreenWidth)/2)), int(math.Round(float64(bluestacks.ScreenHeight)/2)))
-		robotgo.MilliSleep(100)
-		bluestacks.MoveClick(faTabCoords.X, faTabCoords.Y)
-		robotgo.MilliSleep(200)
-		robotgo.Click()
-		robotgo.MilliSleep(200)
-		robotgo.Click()
+		// bluestacks.MoveClick(int(math.Round(float64(bluestacks.ScreenWidth)/2)), int(math.Round(float64(bluestacks.ScreenHeight)/2)))
+		// robotgo.MilliSleep(100)
+		bluestacks.MoveClick(faAppCoords.X, faAppCoords.Y)
 
 		robotgo.MilliSleep(1000) // In case there is a Splash Screen
 
@@ -272,7 +270,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			return Coords{}, nil
 		}, "filterFolder")
 		bluestacks.MoveClick(folderFilterCoords.X, folderFilterCoords.Y+int(math.Round(float64(bluestacks.ScreenHeight)*0.1)))
-		log.Printf("[Face %v] Image selected for enhancing...\n", imageId)
+		log.Printf("[Index %v Face %v] Image selected for enhancing...\n", i, imageId)
 
 		// 4. Wait for the an enhancement to show
 		count := 0
@@ -298,7 +296,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		}
 		// Skip the image if it has not been detected -- Could becasue FaceApp failed to detect the image too
 		if !selectedFaceLoaded {
-			log.Printf("WARN: [Face %v] No enhancements detected after selection...\n", imageId)
+			log.Printf("WARN: [Index %v Face %v] No enhancements detected after selection...\n", i, imageId)
 			_ = bluestacks.OsBackClick()   // Exit back to FaceApp home screen
 			err = bluestacks.OsBackClick() // Exit out of FaceApp to the Bluestacks Home Screen
 			if err != nil {
@@ -309,7 +307,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 		editorScreenImg := robotgo.CaptureImg()
 
-		log.Printf("[Face %v] Starting enhancement...\n", imageId)
+		log.Printf("[Index %v Face %v] Starting enhancement...\n", i, imageId)
 
 		// Ensure that the Female Gender Controls are Activated
 		genderSwitchIconCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
@@ -339,7 +337,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			// return bluestacks.GetImagePathCoordsInImage("./assets/faceapp/gender-switch-icon.png", editorScreenImg)
 		}, "editor-gender-switch-icon")
 		if err != nil {
-			log.Printf("[Face %v] ERROR: Cannot select gender switch icon - %v\n", imageId, err.Error())
+			log.Printf("[Index %v Face %v] ERROR: Cannot select gender switch icon - %v\n", i, imageId, err.Error())
 			continue
 		}
 		// if debugMode {
@@ -425,13 +423,13 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 			// proceed with enhancement
 			editorScreenImg := robotgo.CaptureImg()
-			log.Printf("[Face %v] Entering into enhancement %s ... \n", imageId, enhancement.Name)
+			log.Printf("[Index %v Face %v] Entering into enhancement %s ... \n", i, imageId, enhancement.Name)
 			eCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/enhancement-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-"))), editorScreenImg)
 				return coords, err
 			}, fmt.Sprintf("enhancement-%s", enhancement.Name))
 			if err != nil {
-				log.Printf("[Face %v] ERROR: Cannot select enhancement %s - %v\n", imageId, enhancement.Name, err.Error())
+				log.Printf("[Index %v Face %v] ERROR: Cannot select enhancement %s - %v\n", i, imageId, enhancement.Name, err.Error())
 				continue
 			}
 			// if debugMode {
@@ -450,7 +448,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 						break
 					}
 				}
-				log.Printf("[Face %v] Finding scroll reference of type %s to find enhancement %s type %s ... \n", imageId, scrollReferenceEnhancementType.Name, enhancement.Name, eType.Name)
+				log.Printf("[Index %v Face %v] Finding scroll reference of type %s to find enhancement %s type %s ... \n", i, imageId, scrollReferenceEnhancementType.Name, enhancement.Name, eType.Name)
 				// etCoords, err := bluestacks.GetTextCoordsInImageWithCache(scrollReferenceEnhancementType.Name, intenseEditorScreenImg, fmt.Sprintf("enhancement-type-%s", scrollReferenceEnhancementType.Name))
 				etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 					coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(scrollReferenceEnhancementType.Name, " ", "-"))), editorScreenImg)
@@ -460,11 +458,11 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				// 	q.Q("Scroll Reference Enhancement Type Coords: ", scrollReferenceEnhancementType.Name, etCoords)
 				// }
 				if err != nil {
-					log.Printf("[Face %v] ERROR: Cannot find enhancement type %s for scroll reference - %v\n", imageId, scrollReferenceEnhancementType.Name, err.Error())
+					log.Printf("[Index %v Face %v] ERROR: Cannot find enhancement type %s for scroll reference - %v\n", i, imageId, scrollReferenceEnhancementType.Name, err.Error())
 					err = bluestacks.OsBackClick() // Exit from enhancement type selection Screen
 					// We don't go all the way back to the BS Home here, because we're interating over enhancements.
 					if err != nil {
-						log.Fatalf("[Face %v] ERROR: %v\n", imageId, err.Error())
+						log.Fatalf("[Index %v Face %v] ERROR: %v\n", i, imageId, err.Error())
 					}
 					continue
 				}
@@ -476,7 +474,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				}
 				robotgo.MilliSleep(1000)
 				editorScreenImg = robotgo.CaptureImg() // Re-capture after the enhancement type horizontal scroll
-				log.Printf("[Face %v] Horizontal scroll to find enhancement %s type %s\n", imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
+				log.Printf("[Index %v Face %v] Horizontal scroll to find enhancement %s type %s\n", i, imageId, enhancement.Name, scrollReferenceEnhancementType.Name)
 			}
 			if debugMode {
 				go func() {
@@ -484,7 +482,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				}()
 			}
 
-			log.Printf("[Face %v] Attempting to enhance using enhancement %s type %s ... \n", imageId, enhancement.Name, eType.Name)
+			log.Printf("[Index %v Face %v] Attempting to enhance using enhancement %s type %s ... \n", i, imageId, enhancement.Name, eType.Name)
 			etCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				coords, _, err := bluestacks.GetImagePathCoordsInImage(fmt.Sprintf("./assets/faceapp/etype-%s-%s.png", strings.ToLower(strings.ReplaceAll(enhancement.Name, " ", "-")), strings.ToLower(strings.ReplaceAll(eType.Name, " ", "-"))), editorScreenImg)
 				return coords, err
@@ -493,22 +491,22 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			// 	q.Q("Enhancement Type Coords: ", eType.Name, etCoords)
 			// }
 			if err != nil {
-				log.Printf("[Face %v] ERROR: Cannot find enhancement type %s - %v\n", imageId, eType.Name, err.Error())
+				log.Printf("[Index %v Face %v] ERROR: Cannot find enhancement type %s - %v\n", i, imageId, eType.Name, err.Error())
 				err = bluestacks.OsBackClick() // Exit from enhancement type selection screen
 				// We don't go all the way back to the BS Home here, because we're interating over enhancements.
 				if err != nil {
-					log.Fatalf("[Face %v] ERROR: %v\n", imageId, err.Error())
+					log.Fatalf("[Index %v Face %v] ERROR: %v\n", i, imageId, err.Error())
 				}
 				continue
 			}
 			bluestacks.MoveClick(etCoords.X, etCoords.Y)
-			log.Printf("[Face %v] Enhanced using enhancement %s type %s\n", imageId, enhancement.Name, eType.Name)
+			log.Printf("[Index %v Face %v] Enhanced using enhancement %s type %s\n", i, imageId, enhancement.Name, eType.Name)
 			applyCoords, err := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 				coords, _, err := bluestacks.GetImagePathCoordsInImage("./assets/faceapp/apply.png", editorScreenImg)
 				return coords, err
 			}, "editor-apply")
 			if err != nil {
-				log.Fatalf("[Face %v] ERROR: Cannot find Apply text/button - %v\n", imageId, err.Error())
+				log.Fatalf("[Index %v Face %v] ERROR: Cannot find Apply text/button - %v\n", i, imageId, err.Error())
 				continue
 			}
 			// if debugMode {
@@ -517,7 +515,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			bluestacks.MoveClick(applyCoords.X, applyCoords.Y)
 			robotgo.Click()          // Double click to make sure....
 			robotgo.MilliSleep(2000) // Wait for Apply and return to editor screen animation
-			log.Printf("[Face %v] Enhancement %v : %v applied\n", imageId, enhancement.Name, eType.Name)
+			log.Printf("[Index %v Face %v] Enhancement %v : %v applied\n", i, imageId, enhancement.Name, eType.Name)
 
 			enhancementsApplied = append(enhancementsApplied, map[string]string{
 				"name": enhancement.Name,
@@ -559,27 +557,27 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				}
 			}
 			if !isSaved {
-				log.Printf("[Face %v] WARN: Failed to Save.\n", imageId)
+				log.Printf("[Index %v Face %v] WARN: Failed to Save.\n", i, imageId)
 				_ = bluestacks.ExitScreen(len(enhancementsApplied) > 0) // Exit the enhancement selection screen to the gallery screen
 				err = bluestacks.OsBackClick()                          // Exit to the BS Home Screen
 				if err != nil {
-					log.Fatalf("[Face %v] ERROR: %v", imageId, err.Error())
+					log.Fatalf("[Index %v Face %v] ERROR: %v", i, imageId, err.Error())
 				}
 				robotgo.MilliSleep(1000)
 				continue
 			}
-			log.Printf("[Face %v] Saved!\n", imageId)
+			log.Printf("[Index %v Face %v] Saved!\n", i, imageId)
 			faceRect := bluestacks.DetectFaces(postSaveImg, 300) // Increase validity integer to prevent detching before & after faces
 			// Cache the post-save face detection. This way we can fallback in the case the face detected is not at center of the screen, or if there are no faces detected.
 			if len(faceRect) != 1 {
 				if len(faceRect) > 1 {
 					// This was being hit due to the images inside of then Before & After image.
-					log.Printf("WARN: [Face %v] Detected multiple faces after enhancement...\n", imageId)
+					log.Printf("WARN: [Index %v Face %v] Detected multiple faces after enhancement...\n", i, imageId)
 				} else if len(faceRect) == 0 {
-					log.Printf("WARN: [Face %v] Cannot find Detected Enhanced Face...\n", imageId)
+					log.Printf("WARN: [Index %v Face %v] Cannot find Detected Enhanced Face...\n", i, imageId)
 				}
 				if len(detectedEnhancedFaces) == 0 {
-					log.Printf("ERROR: [Face %v] No cached Detected Enhanced Face Coordinates to use...\n", imageId)
+					log.Printf("ERROR: [Index %v Face %v] No cached Detected Enhanced Face Coordinates to use...\n", i, imageId)
 					// Use the back button to return to the BS Home Screen
 					_ = bluestacks.OsBackClick() // Exit the Save Screen
 					robotgo.MilliSleep(100)
@@ -587,11 +585,11 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 					robotgo.MilliSleep(100)
 					err = bluestacks.OsBackClick() // and then FaceApp
 					if err != nil {
-						log.Fatalf("[Face %v] ERROR: %v", imageId, err.Error())
+						log.Fatalf("[Index %v Face %v] ERROR: %v", i, imageId, err.Error())
 					}
 					continue
 				} else {
-					log.Printf("[Face %v] Using average cached Detected Enhanced Face Coordinates\n", imageId)
+					log.Printf("[Index %v Face %v] Using average cached Detected Enhanced Face Coordinates\n", i, imageId)
 					// Determine total rect from previously detected post-save faces
 					var totalRect image.Rectangle
 					for _, r := range detectedEnhancedFaces {
@@ -618,19 +616,19 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 			enhancedFaceImgPath = path.Join(outputDir, fmt.Sprintf("%v.jpeg", imageId))
 			go func() {
 				if gcv.ImgWrite(enhancedFaceImgPath, enhancedFaceImg) {
-					log.Printf("[Face %v] Successfully saved detected enhanced image\n", imageId)
+					log.Printf("[Index %v Face %v] Successfully saved detected enhanced image\n", i, imageId)
 				} else {
-					log.Printf("[Face %v] WARN: Failed to save detected enhanced image\n", imageId)
+					log.Printf("[Index %v Face %v] WARN: Failed to save detected enhanced image\n", i, imageId)
 				}
 			}()
 
 			// Use the back button to return to the Editor Screen
 			err = bluestacks.OsBackClick()
 			if err != nil {
-				log.Fatalf("[Face %v] ERROR: %v", imageId, err.Error())
+				log.Fatalf("[Index %v Face %v] ERROR: %v\n", i, imageId, err.Error())
 			}
 		}
-		log.Printf("[Face %v] %d enhancements made\n", imageId, len(enhancementsApplied))
+		log.Printf("[Index %v Face %v] %d enhancements made\n", i, imageId, len(enhancementsApplied))
 
 		imageIndex = append(imageIndex, IndexedImage{
 			Id:                imageId,
@@ -646,6 +644,10 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		if err != nil {
 			log.Fatal("ERROR: ", err.Error())
 		}
+
+		// Two more just in case...
+		_ = bluestacks.OsBackClick()
+		_ = bluestacks.OsBackClick()
 	}
 
 	// Save Image Index to file
