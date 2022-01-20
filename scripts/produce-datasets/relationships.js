@@ -13,7 +13,6 @@ const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
-const { ClarifaiStub, grpc } = require("clarifai-nodejs-grpc");
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
 	program.requiredOption(
@@ -27,17 +26,7 @@ const options = require("../utils/options")((program) => {
 });
 // const { inspectObject } = require("../utils");
 
-const { CLARIFAI_API_KEY } = process.env;
-
-if (!CLARIFAI_API_KEY) {
-	throw new Error("OpenAI API Key is required to execute this Script");
-}
-
 const { input, output: outputDir, overwrite } = options;
-
-const stub = ClarifaiStub.grpc();
-const metadata = new grpc.Metadata();
-metadata.set("authorization", `Key ${CLARIFAI_API_KEY}`);
 
 debugLog(`Output Directory: ${outputDir}`);
 
@@ -74,55 +63,8 @@ mkdirp.sync(outputDir);
 			const fileBuffer = await fs.readFile(image);
 			const fileBase64 = Buffer.from(fileBuffer).toString("base64");
 			// console.log(fileBase64.substring(0, 30));
-			const result = await new Promise((resolve, reject) => {
-				// Note: One operation is also one reqeust. A request with multiple inputs is an operation for each input.
-				stub.PostModelOutputs(
-					{
-						// This is the model ID of a publicly available General model. You may use any other public or custom model ID.
-						model_id: "93c277ec3940fba661491fda4d3ccfa0", // appearance-multicultural -- pre-trained model
-						inputs: [
-							{
-								data: {
-									image: { base64: fileBase64 }
-								}
-							}
-						]
-					},
-					metadata,
-					(err, response) => {
-						if (err) {
-							return reject(err);
-						}
 
-						if (response.status.code !== 10000) {
-							// console.log(inspectObject(response));
-							debugLog(
-								"Received failed status: " +
-									response.status.description +
-									"\n" +
-									response.status.details
-							);
-							return reject(
-								new Error(
-									JSON.stringify({
-										id: name,
-										error: response.status,
-										outputs: response.outputs.map((output) => output.status)
-									})
-								)
-							);
-						}
-
-						debugLog("Predicted concepts, with confidence values:");
-						response.outputs[0].data.concepts.forEach((c) => {
-							debugLog(c.name + ": " + c.value);
-						});
-						return resolve(response.outputs[0]);
-					}
-				);
-			});
-
-			await jsonfile.writeFile(outputFile, result.data.concepts);
+			await jsonfile.writeFile(outputFile, {});
 
 			return { image, output: outputFile };
 		},
@@ -133,7 +75,7 @@ mkdirp.sync(outputDir);
 	);
 
 	// Queue the images for filtering.
-	console.log(chalk.yellow(`Processing ethnicity analysis of input images...`));
+	console.log(chalk.yellow(`Processing relationships from input images...`));
 	sourceImages.forEach((image, i) => {
 		q.push({ image, i });
 	});

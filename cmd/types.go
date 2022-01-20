@@ -12,6 +12,11 @@ type FaceData struct {
 	FaceDetails []types.FaceDetail `json:"FaceDetails"`
 }
 
+type FaceById struct {
+	Id   string
+	Data FaceData
+}
+
 var (
 	// Index each face to an output directory
 	imageIndex []IndexedImage

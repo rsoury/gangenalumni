@@ -68,13 +68,13 @@ const facialHairMapping = {
 	Goatee: "Circle Beard",
 	Lion: "Chin Curtain"
 };
-const makeupMapping = {
-	Makeup: "Youthful",
-	"Makeup 2": "Light",
-	"Makeup 3": "Casual",
-	"Makeup 4": "Fair",
-	"No Makeup": "Au Naturel"
-};
+// const makeupMapping = {
+// 	Makeup: "Youthful",
+// 	"Makeup 2": "Light",
+// 	"Makeup 3": "Casual",
+// 	"Makeup 4": "Fair",
+// 	"No Makeup": "Au Naturel"
+// };
 const ethnicityMapping = {
 	White: "Caucasian",
 	Black: "African",
@@ -198,15 +198,43 @@ mkdirp.sync(outputDir);
 
 			const faceDetails = faceData.FaceDetails[0];
 
+			// Gender
 			const gender =
 				faceDetails.Gender.Confidence > 0.8
 					? faceDetails.Gender.Value
 					: "Non-Binary";
+			// Age
 			const age =
 				Math.floor(
 					Math.random() * (faceDetails.AgeRange.High - faceDetails.AgeRange.Low)
 				) + faceDetails.AgeRange.Low;
+			// Mood
 			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
+			// Eyewear
+			let eyewear = "Nothing";
+			if (faceDetails.Sunglasses.Value) {
+				eyewear = "Sunglasses";
+			} else if (faceDetails.Eyeglasses.Value) {
+				eyewear = "Eyeglasses";
+			}
+			// Mouth
+			let mouth;
+			if (faceDetails.MouthOpen.Value && faceDetails.Smile.Value) {
+				mouth = "Open Smile";
+			} else if (faceDetails.Smile.Value) {
+				mouth = "Smiling";
+			} else if (faceDetails.MouthOpen.Value) {
+				mouth = "Open";
+			} else {
+				mouth = "Closed";
+			}
+			// // Facing
+			// let facing = "Forward";
+			// if (faceDetails.Pose.Yaw < 10) {
+			// 	facing = "Left";
+			// } else if (faceDetails.Pose.Yaw > 10) {
+			// 	facing = "Right";
+			// }
 			attributes.push({
 				trait_type: "Gender",
 				value: gender
@@ -219,6 +247,24 @@ mkdirp.sync(outputDir);
 				trait_type: "Mood",
 				value: mood
 			});
+			attributes.push({
+				trait_type: "Eyewear",
+				value: eyewear
+			});
+			attributes.push({
+				trait_type: "Eyes",
+				value: faceDetails.EyesOpen.Value ? "Open" : "Closed"
+			});
+			if (mouth) {
+				attributes.push({
+					trait_type: "Mouth",
+					value: mouth
+				});
+			}
+			// attributes.push({
+			// 	trait_type: "Facing",
+			// 	value: facing
+			// });
 
 			ethnicityData.forEach((eth) => {
 				if (eth.value > 0.25) {
@@ -252,16 +298,16 @@ mkdirp.sync(outputDir);
 						value
 					});
 				}
-				if (e.name === "Makeup") {
-					let value = e.type;
-					if (typeof makeupMapping[e.type] !== "undefined") {
-						value = makeupMapping[e.type];
-					}
-					attributes.push({
-						trait_type: "Makeup",
-						value
-					});
-				}
+				// if (e.name === "Makeup") {
+				// 	let value = e.type;
+				// 	if (typeof makeupMapping[e.type] !== "undefined") {
+				// 		value = makeupMapping[e.type];
+				// 	}
+				// 	attributes.push({
+				// 		trait_type: "Makeup",
+				// 		value
+				// 	});
+				// }
 			});
 
 			const attrText = attributes

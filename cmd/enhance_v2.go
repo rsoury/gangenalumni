@@ -386,13 +386,13 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				}
 			}
 			if enhancement.Name == "Beards" {
-				if faceDetails.Beard.Value {
+				if faceDetails.Beard.Value || faceDetails.Mustache.Value {
 					applyEnhancement = true
-					for _, t := range enhancement.Types {
-						if t.Name == "Full beard" {
-							eType = t
-						}
-					}
+					// for _, t := range enhancement.Types {
+					// 	if t.Name == "Full beard" {
+					// 		eType = t
+					// 	}
+					// }
 				}
 			}
 			if !applyEnhancement {

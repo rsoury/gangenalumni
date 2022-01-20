@@ -17,11 +17,6 @@ import (
 	cli "github.com/spf13/cobra"
 )
 
-type FaceById struct {
-	Id   string
-	Data FaceData
-}
-
 var (
 	glassesCmd = &cli.Command{
 		Use:   "glasses",
