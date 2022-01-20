@@ -31,6 +31,7 @@ import (
 	cli "github.com/spf13/cobra"
 	"github.com/vcaesar/gcv"
 	"github.com/vcaesar/imgo"
+	"go.uber.org/ratelimit"
 )
 
 var (
@@ -110,6 +111,9 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
+	// Set up rate limit
+	rl := ratelimit.New(5, ratelimit.Per(60*time.Second)) // 5 iterations per minute rate limit
+
 	// Start from the Home Screen
 	// 1. Iterate over each image in Source Dir
 	// 2. For each image, open Media Manage, wait for File Picker, use Shift+Cmd+g to navigate to the target file and use "Enter" to open
@@ -154,7 +158,9 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		}
 		bluestacks.MoveClick(mediaManagerTabCloseCoords.X, mediaManagerTabCloseCoords.Y)
 	}
+
 	var detectedEnhancedFaces []image.Rectangle // Cache of faces saved in post-save screen
+	prevTime := time.Now()
 	for i, imagePath := range imagePaths {
 		if limit > 0 {
 			if i > limit-1 {
@@ -269,8 +275,11 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		folderFilterCoords, _ := bluestacks.GetCoordsWithCache(func() (Coords, error) {
 			return Coords{}, nil
 		}, "filterFolder")
+
+		nowTime := rl.Take() //* Block in case rate limit is reached.
+
 		bluestacks.MoveClick(folderFilterCoords.X, folderFilterCoords.Y+int(math.Round(float64(bluestacks.ScreenHeight)*0.1)))
-		log.Printf("[Index %v Face %v] Image selected for enhancing...\n", i, imageId)
+		log.Printf("[Index %v Face %v] Image selected for enhancing... (%v)\n", i, imageId, nowTime.Sub(prevTime)) // logs the delay
 
 		// 4. Wait for the an enhancement to show
 		count := 0
@@ -648,6 +657,8 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		// Two more just in case...
 		_ = bluestacks.OsBackClick()
 		_ = bluestacks.OsBackClick()
+
+		prevTime = nowTime // Reset time at the end of the iteration
 	}
 
 	// Save Image Index to file

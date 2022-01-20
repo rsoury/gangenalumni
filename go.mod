@@ -22,6 +22,7 @@ require (
 
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.6.4 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.8.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.2 // indirect
@@ -56,6 +57,7 @@ require (
 	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/vcaesar/gops v0.21.2 // indirect
 	github.com/vcaesar/tt v0.20.0 // indirect
+	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect
 	golang.org/x/sys v0.0.0-20220111092808-5a964db01320 // indirect
