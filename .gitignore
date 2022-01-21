@@ -29,3 +29,6 @@ data/**/*
 !data/nft/.gitkeep
 deployments/localhost
 deployments/hardhat
+
+# BI
+bi/data

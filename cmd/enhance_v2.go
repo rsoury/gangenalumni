@@ -92,6 +92,13 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		log.Fatalln("ERROR:", err)
 	}
 
+	// Create output json file
+	jsonFile, err := os.Create(path.Join(outputDir, "index.json"))
+	if err != nil {
+		log.Fatal("ERROR: ", err.Error())
+	}
+	defer jsonFile.Close()
+
 	// Setup Face Analysis Data Paths - Fetch all the JSON paths from the facedata directory
 	facedataPaths, err := filepath.Glob(path.Join(facedataDir, "/*.json"))
 	if err != nil {
@@ -111,8 +118,8 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 
 	time.Sleep(1 * time.Second) // Just pause to ensure there is a window change.
 
-	// Set up rate limit
-	rl := ratelimit.New(5, ratelimit.Per(60*time.Second)) // 5 iterations per minute rate limit
+	// Set up rate limit -- 40 per 10 minutes
+	rl := ratelimit.New(10, ratelimit.Per(10*60*time.Second)) // // 5 iterations per minute rate limit
 
 	// Start from the Home Screen
 	// 1. Iterate over each image in Source Dir
@@ -129,6 +136,7 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 	if err != nil {
 		log.Fatal("ERROR: ", err.Error())
 	}
+
 	screenImg := robotgo.CaptureImg()
 	if debugMode {
 		go func() {
@@ -659,25 +667,21 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 		_ = bluestacks.OsBackClick()
 
 		prevTime = nowTime // Reset time at the end of the iteration
-	}
 
-	// Save Image Index to file
-	// https://www.socketloop.com/tutorials/golang-save-map-struct-to-json-or-xml-file
-	imageIndexJson, err := json.Marshal(imageIndex)
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
+		// Save Image Index to file
+		// https://www.socketloop.com/tutorials/golang-save-map-struct-to-json-or-xml-file
+		imageIndexJson, err := json.Marshal(imageIndex)
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
+		_ = jsonFile.Truncate(0)
+		_, _ = jsonFile.Seek(0, 0)
+		_, err = jsonFile.Write(imageIndexJson)
+		if err != nil {
+			log.Fatal("ERROR: ", err.Error())
+		}
+		log.Printf("JSON data written to %v\n", jsonFile.Name())
 	}
-	jsonFile, err := os.Create(path.Join(outputDir, "index.json"))
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	defer jsonFile.Close()
-	_, err = jsonFile.Write(imageIndexJson)
-	if err != nil {
-		log.Fatal("ERROR: ", err.Error())
-	}
-	jsonFile.Close()
-	log.Println("JSON data written to ", jsonFile.Name())
 
 	// Desktop notification of completion
 	_ = beeep.Notify("Automatically Animated", "Enhancement script is complete", "")

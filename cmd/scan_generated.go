@@ -33,14 +33,6 @@ func init() {
 	scanGeneratedCmd.PersistentFlags().Bool("simple", false, "Run the check simply. Only compare images immediately before and after the current source image.")
 }
 
-func getId(imgPath string) string {
-	filename := filepath.Base(imgPath)
-	extension := filepath.Ext(filename)
-	id := filename[0 : len(filename)-len(extension)]
-
-	return id
-}
-
 func ScanGenerated(cmd *cli.Command, args []string) {
 	sourceDir, _ := cmd.Flags().GetString("source")
 	maxQueue, _ := cmd.Flags().GetInt("max-queue")
@@ -70,12 +62,12 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 		for i := 0; i < len(filePaths); i++ {
 			lastIndex := 0
 			if len(orderedPaths) > 0 {
-				id := getId(orderedPaths[len(orderedPaths)-1])
+				id := getFileName(orderedPaths[len(orderedPaths)-1])
 				lastIndex, _ = strconv.Atoi(id)
 			}
 			newIndex := lastIndex + 1
 			for _, imgPath := range filePaths {
-				currentId := getId(imgPath)
+				currentId := getFileName(imgPath)
 				currentIndex, _ := strconv.Atoi(currentId)
 				if newIndex == currentIndex {
 					orderedPaths = append(orderedPaths, imgPath)
@@ -88,7 +80,7 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 		// }
 
 		for i, sourceImagePath := range orderedPaths {
-			srcId := getId(sourceImagePath)
+			srcId := getFileName(sourceImagePath)
 			srcImg, _, _ := imgo.DecodeFile(sourceImagePath)
 			var compareImagePaths []string
 			if i != 0 {
@@ -101,7 +93,7 @@ func ScanGenerated(cmd *cli.Command, args []string) {
 				if sourceImagePath == compareImagePath {
 					continue
 				}
-				cmpId := getId(compareImagePath)
+				cmpId := getFileName(compareImagePath)
 
 				// Update suffix
 				s.Suffix = fmt.Sprintf(" Comparing source %s to %s", srcId, cmpId)
