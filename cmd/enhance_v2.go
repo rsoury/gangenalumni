@@ -580,6 +580,8 @@ func EnhanceV2(cmd *cli.Command, args []string) {
 				if err != nil {
 					log.Fatalf("[Index %v Face %v] ERROR: %v", i, imageId, err.Error())
 				}
+				_ = bluestacks.OsBackClick() // Just to be sure
+				_ = bluestacks.OsBackClick()
 				robotgo.MilliSleep(1000)
 				continue
 			}

@@ -199,10 +199,15 @@ mkdirp.sync(outputDir);
 			const faceDetails = faceData.FaceDetails[0];
 
 			// Gender
-			const gender =
-				faceDetails.Gender.Confidence > 0.8
-					? faceDetails.Gender.Value
-					: "Non-Binary";
+			let gender = faceDetails.Gender.Value;
+			if (
+				faceDetails.Gender.Confidence <= 0.8 ||
+				(gender === "Female" &&
+					(faceDetails.Beard.Value === true ||
+						faceDetails.Mustache.Value === true))
+			) {
+				gender = "Non-Binary";
+			}
 			// Age
 			const age =
 				Math.floor(
