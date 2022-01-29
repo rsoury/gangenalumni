@@ -43,13 +43,11 @@ contract ERC1155Tradable is
 		string memory _name,
 		string memory _symbol,
 		string memory _uri,
-		address _proxyRegistryAddress,
-		address publicMinter
+		address _proxyRegistryAddress
 	) ERC1155(_uri) {
 		name = _name;
 		symbol = _symbol;
 		proxyRegistryAddress = _proxyRegistryAddress;
-		_minterAddress = publicMinter;
 		_initializeEIP712(name);
 	}
 

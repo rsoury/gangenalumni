@@ -20,17 +20,8 @@ contract NFT is ERC1155Tradable {
 		string memory name,
 		string memory symbol,
 		string memory cURI,
-		string memory tokenURI,
-		address publicMinter
-	)
-		ERC1155Tradable(
-			name,
-			symbol,
-			tokenURI,
-			_proxyRegistryAddress,
-			publicMinter
-		)
-	{
+		string memory tokenURI
+	) ERC1155Tradable(name, symbol, tokenURI, _proxyRegistryAddress) {
 		_contractURI = cURI;
 	}
 

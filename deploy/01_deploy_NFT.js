@@ -59,10 +59,11 @@ module.exports = async ({ getNamedAccounts, deployments, network, ethers }) => {
 		);
 	}
 
+	const signer = await ethers.getSigner(deployer);
 	const NFT = await ethers.getContractFactory("NFT");
 	const nft = await NFT.attach(nftDeployResult.address);
 	const tx = await nft
-		.connect(deployer)
+		.connect(signer)
 		.setMinter(nftPublicMinterDeployResult.address);
 
 	await tx.wait();
