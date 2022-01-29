@@ -5,6 +5,9 @@ const _ = require("lodash");
 task("public-mint", "Public/Payment-based NFT token Mint to address")
 	.addOptionalParam("count", "Number of tokens to mint", "1")
 	.setAction(async (taskArgs, { ethers, deployments }) => {
+		const npmDeployment = await deployments.get("NFTPublicMinter");
+		const NFTPublicMinter = await ethers.getContractFactory("NFTPublicMinter");
+		const npm = await NFTPublicMinter.attach(npmDeployment.address);
 		const nftDeployment = await deployments.get("NFT");
 		const NFT = await ethers.getContractFactory("NFT");
 		const nft = await NFT.attach(nftDeployment.address);
@@ -20,7 +23,7 @@ task("public-mint", "Public/Payment-based NFT token Mint to address")
 
 		const value = 0.1 * count;
 		console.log(`Minting to ${owner.address} for ${value} ETH...`);
-		const tx = await nft.connect(owner).publicMint(count, {
+		const tx = await npm.connect(owner).publicMint(count, {
 			value: ethers.utils.parseEther(`${value}`)
 		});
 		console.log(`Transaction created: ${tx.hash}`);

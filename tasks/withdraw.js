@@ -3,9 +3,9 @@
 task("withdraw", "Withdraw balance from NFT Smart Contract")
 	.addOptionalParam("to", "Address to send withdrawn funds")
 	.setAction(async (taskArgs, { ethers, deployments, waffle }) => {
-		const nftDeployment = await deployments.get("NFT");
-		const NFT = await ethers.getContractFactory("NFT");
-		const nft = await NFT.attach(nftDeployment.address);
+		const npmDeployment = await deployments.get("NFTPublicMinter");
+		const NFTPublicMinter = await ethers.getContractFactory("NFTPublicMinter");
+		const npm = await NFTPublicMinter.attach(npmDeployment.address);
 
 		let { to } = taskArgs;
 
@@ -16,14 +16,14 @@ task("withdraw", "Withdraw balance from NFT Smart Contract")
 		}
 
 		const { provider } = waffle;
-		const balance = await provider.getBalance(nftDeployment.address);
+		const balance = await provider.getBalance(npmDeployment.address);
 
 		console.log(
 			`Withdrawing balance of ${ethers.utils.formatEther(
 				balance
 			)} ETH to ${to}...`
 		);
-		const tx = await nft.connect(owner).withdraw(to);
+		const tx = await npm.connect(owner).withdraw(to);
 		console.log(`Transaction created: ${tx.hash}`);
 		await tx.wait();
 		console.log(`Withdrawal successful!`);

@@ -45,7 +45,7 @@ task("batch-mint", "Batch mint NFT tokens to addresses")
 		}
 
 		const [owner] = await ethers.getSigners();
-		const tx = await nft.connect(owner).batchMint(
+		const tx = await nft.connect(owner).batchMintToMany(
 			recipients.map(({ address }) => address),
 			recipients.map(({ ids }) => ids),
 			customUri,

@@ -1,5 +1,5 @@
 // deploy/00_deploy_NFT.js
-module.exports = async ({ getNamedAccounts, deployments, network }) => {
+module.exports = async ({ getNamedAccounts, deployments, network, ethers }) => {
 	const { deploy, log } = deployments;
 	const { deployer } = await getNamedAccounts();
 	// OpenSea proxy registry addresses for rinkeby and mainnet.
@@ -44,6 +44,32 @@ module.exports = async ({ getNamedAccounts, deployments, network }) => {
 	if (nftDeployResult.newlyDeployed) {
 		log(
 			`contract NFT deployed at ${nftDeployResult.address} using ${nftDeployResult.receipt.gasUsed} gas`
+		);
+	}
+
+	const nftPublicMinterDeployResult = await deploy("NFTPublicMinter", {
+		from: deployer,
+		args: [nftDeployResult.address],
+		log: true
+	});
+
+	if (nftPublicMinterDeployResult.newlyDeployed) {
+		log(
+			`contract NFT deployed at ${nftPublicMinterDeployResult.address} using ${nftPublicMinterDeployResult.receipt.gasUsed} gas`
+		);
+	}
+
+	const NFT = await ethers.getContractFactory("NFT");
+	const nft = await NFT.attach(nftDeployResult.address);
+	const tx = await nft
+		.connect(deployer)
+		.setMinter(nftPublicMinterDeployResult.address);
+
+	await tx.wait();
+
+	if (nftPublicMinterDeployResult.newlyDeployed) {
+		log(
+			`PublicMinter contract set as NFT minter in TX ${tx.hash} using ${tx.gasPrice} gas`
 		);
 	}
 };

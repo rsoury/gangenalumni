@@ -45,6 +45,7 @@ module.exports = {
 		"no-underscore-dangle": 0,
 		camelcase: 0,
 		"no-multi-assign": 0,
-		"no-await-in-loop": 0
+		"no-await-in-loop": 0,
+		"no-unused-expressions": "off"
 	}
 };

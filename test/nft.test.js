@@ -4,6 +4,7 @@ const _ = require("lodash");
 const expectThrow = require("./helpers/expect-throw");
 
 let nft;
+let npm;
 const tokenURI =
 	"https://gangenalumni.s3.us-east-2.amazonaws.com/rinkeby/data/{id}.json";
 const contractURI =
@@ -24,6 +25,8 @@ describe("NFT Smart Contract Tests", () => {
 			contractURI,
 			tokenURI
 		);
+		const NFTPublicMinter = await ethers.getContractFactory("NFTPublicMinter");
+		npm = await NFTPublicMinter.deploy(nft.address, []);
 	});
 
 	it("Token is minted successfully", async () => {
@@ -49,7 +52,7 @@ describe("NFT Smart Contract Tests", () => {
 		const overrides = {
 			value: ethers.utils.parseEther("0.1")
 		};
-		await nft.connect(account).publicMint(1, overrides);
+		await npm.connect(account).publicMint(1, overrides);
 		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
 	});
 
@@ -59,7 +62,7 @@ describe("NFT Smart Contract Tests", () => {
 			value: ethers.utils.parseEther("0.01")
 		};
 		await expectThrow(
-			nft.connect(account).publicMint(1, overrides),
+			npm.connect(account).publicMint(1, overrides),
 			"invalid value"
 		);
 	});
@@ -85,7 +88,7 @@ describe("NFT Smart Contract Tests", () => {
 			return [i + 1];
 		});
 		// console.log(addresses, idsPerAddress);
-		await nft.connect(owner).batchMint(addresses, idsPerAddress, "", []);
+		await nft.connect(owner).batchMintToMany(addresses, idsPerAddress, "", []);
 		const balances = await Promise.all(
 			accounts.map((account, i) => {
 				return nft.balanceOf(account.address, i + 1);
@@ -99,7 +102,7 @@ describe("NFT Smart Contract Tests", () => {
 	it("Token batch many transfer runs successfully", async () => {
 		const [owner, ...accounts] = await ethers.getSigners();
 		const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-		await nft.connect(owner).batchMint([owner.address], [ids], "", []);
+		await nft.connect(owner).batchMintToMany([owner.address], [ids], "", []);
 		const balances = await Promise.all(
 			ids.map((id) => {
 				return nft.balanceOf(owner.address, id);
@@ -144,7 +147,7 @@ describe("NFT Smart Contract Tests", () => {
 		const overrides = {
 			value: ethers.utils.parseEther("1")
 		};
-		const tx = await nft.connect(account).publicMint(10, overrides);
+		const tx = await npm.connect(account).publicMint(10, overrides);
 		const events = await nft.queryFilter("TransferBatch");
 		const event = events.find(
 			({ args, transactionHash }) =>
@@ -172,7 +175,7 @@ describe("NFT Smart Contract Tests", () => {
 			value: ethers.utils.parseEther("0.1")
 		};
 		await expectThrow(
-			nft.connect(account).publicMint(10, overrides),
+			npm.connect(account).publicMint(10, overrides),
 			"invalid value"
 		);
 	});
@@ -183,7 +186,7 @@ describe("NFT Smart Contract Tests", () => {
 		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
 
 		const promises = _.range(20).map((index) => {
-			return nft.connect(owner).batchMint(
+			return nft.connect(owner).batchMintToMany(
 				[owner.address],
 				// [_.range(index * 1000 + 1, index * 1000 + 1000)],
 				[_.range(index * 500 + 1, index * 500 + 501)], // _.range(1, 501) = [1...500] -- second parameter is the number of elements, rather than the end element.
@@ -241,7 +244,7 @@ describe("NFT Smart Contract Tests", () => {
 			gasLimit: 30000000
 		};
 		await expectThrow(
-			nft.connect(account).publicMint(1, overrides),
+			npm.connect(account).publicMint(1, overrides),
 			"no more tokens"
 		);
 	});
@@ -258,19 +261,22 @@ describe("NFT Smart Contract Tests", () => {
 	it("Token batch permanence is successful", async () => {
 		const [owner] = await ethers.getSigners();
 		const promises = [];
-		for (let i = 1; i <= 10; i += 1) {
-			const resultPromise = nft.connect(owner).mint(owner.address, i, "", []);
+		const ids = _.range(1, 11);
+		for (let i = 0; i < ids.length; i += 1) {
+			const resultPromise = nft
+				.connect(owner)
+				.mint(owner.address, ids[i], "", []);
 			promises.push(resultPromise);
 		}
 		await Promise.all(promises);
 		expect(await nft.balanceOf(owner.address, 3)).to.equal(1);
-		const batchPromise = nft.batchMakePermanent([
-			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-		]);
+		const batchPromise = nft.batchMakePermanent(ids);
 		const batchPermanentPromises = [];
-		for (let i = 1; i <= 10; i += 1) {
+		for (let i = 0; i < ids.length; i += 1) {
 			batchPermanentPromises.push(
-				expect(batchPromise).to.emit(nft, "PermanentURI").withArgs(tokenURI, i)
+				expect(batchPromise)
+					.to.emit(nft, "PermanentURI")
+					.withArgs(tokenURI, ids[i])
 			);
 		}
 		await Promise.all(batchPermanentPromises);
@@ -278,7 +284,52 @@ describe("NFT Smart Contract Tests", () => {
 
 	it("Withdrawal executes successfully", async () => {
 		const [owner] = await ethers.getSigners();
-		const tx = await nft.connect(owner).withdraw(owner.address);
+		const tx = await npm.connect(owner).withdraw(owner.address);
 		expect(tx.hash).to.be.a("string");
+	});
+
+	it("Successfully blacklists an array of tokenIds", async () => {
+		const [owner, account] = await ethers.getSigners();
+		const bIds = _.range(1, 11);
+		const tx = await npm.connect(owner).setBlacklistedTokenIds(bIds);
+		expect(tx.hash).to.be.a("string");
+
+		await tx.wait();
+
+		await npm.connect(account).publicMint(1, {
+			value: ethers.utils.parseEther("0.1")
+		});
+		expect(await nft.balanceOf(account.address, 11)).to.equal(1);
+
+		bIds.push(12);
+		bIds.push(14);
+		bIds.push(15);
+
+		const tx2 = await npm.connect(owner).setBlacklistedTokenIds(bIds);
+		await tx2.wait();
+
+		await npm.connect(account).publicMint(2, {
+			value: ethers.utils.parseEther("0.2")
+		});
+		expect(await nft.balanceOf(account.address, 13)).to.equal(1);
+		expect(await nft.balanceOf(account.address, 16)).to.equal(1);
+
+		expect(await npm.isBlacklisted(12), "Token 12 is blacklisted").to.be.true;
+		expect(await npm.isBlacklisted(1), "Token 1 is blacklisted").to.be.true;
+		expect(await npm.isBlacklisted(13), "Token 13 is not blacklisted").to.be
+			.false;
+	});
+
+	it("Successfully uses the default public mint Custom URI", async () => {
+		const [owner, account] = await ethers.getSigners();
+		const uri = "https://www.webdoodle.com.au/metadata.json";
+		const tx = await npm.connect(owner).setDefaultPublicMintCustomURI(uri);
+		expect(tx.hash).to.be.a("string");
+
+		await npm.connect(account).publicMint(1, {
+			value: ethers.utils.parseEther("0.1")
+		});
+		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
+		expect(await nft.uri(1)).to.equal(uri);
 	});
 });

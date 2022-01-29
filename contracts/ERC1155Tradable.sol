@@ -37,17 +37,36 @@ contract ERC1155Tradable is
 	string public name;
 	// Contract symbol
 	string public symbol;
+	address _minterAddress;
 
 	constructor(
 		string memory _name,
 		string memory _symbol,
 		string memory _uri,
-		address _proxyRegistryAddress
+		address _proxyRegistryAddress,
+		address publicMinter
 	) ERC1155(_uri) {
 		name = _name;
 		symbol = _symbol;
 		proxyRegistryAddress = _proxyRegistryAddress;
+		_minterAddress = publicMinter;
 		_initializeEIP712(name);
+	}
+
+	/**
+	 * @dev Throws if called by any account other than the owner.
+	 */
+	modifier onlyOwnerOrMinter() {
+		address sender = _msgSender();
+		require(
+			owner() == sender || _minterAddress == sender,
+			"ERC1155Tradable: caller is not the owner or a minter"
+		);
+		_;
+	}
+
+	function setMinter(address minter) public onlyOwner {
+		_minterAddress = minter;
 	}
 
 	function uri(uint256 _id) public view override returns (string memory) {
