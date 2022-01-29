@@ -12,7 +12,7 @@ contract NFT is ERC1155Tradable {
 	// Create a contract URI variable
 	string private _contractURI;
 	uint256 public _price = 0.1 ether;
-
+	uint256[] private _blacklistedTokenIds;
 	uint256 public constant MAX_TOKEN_COUNT = 10000;
 
 	event PermanentURI(string _value, uint256 indexed _id);
@@ -22,9 +22,11 @@ contract NFT is ERC1155Tradable {
 		string memory name,
 		string memory symbol,
 		string memory cURI,
-		string memory tokenURI
+		string memory tokenURI,
+		uint256[] memory blacklistedTokenIds
 	) ERC1155Tradable(name, symbol, tokenURI, _proxyRegistryAddress) {
 		_contractURI = cURI;
+		// setBlacklistedTokenIds(blacklistedTokenIds);
 	}
 
 	function contractURI() public view returns (string memory) {
@@ -35,33 +37,44 @@ contract NFT is ERC1155Tradable {
 		_contractURI = newuri;
 	}
 
+	// function setBlacklistedTokenIds(uint256[] memory blacklistedTokenIds)
+	// 	public
+	// 	onlyOwner
+	// {
+	// 	for (uint256 i = 0; i < blacklistedTokenIds.length; i++) {
+	// 		require(
+	// 			tokenSupply[blacklistedTokenIds[i]] == 0,
+	// 			"token already minted or blacklisted"
+	// 		);
+	// 		tokenSupply[blacklistedTokenIds[i]] = -1;
+	// 	}
+	// }
+
 	/**
-	 * @dev Mint a new token type and assigns _initialSupply to an address
-	 * @param initialOwner address of the first owner of the token
-	 * @param id The id of the token to create (must not currenty exist).
-	 * @param uri Optional URI for this token type
-	 * @param data Data to pass if receiver is contract
-	 * @return The newly created token ID
+	 * @dev Sets a custom URI for all tokens without a custom URI using the current default Token URI -- and then set a new default Token URI
+	 * @param newuri New URI for all tokens
 	 */
+	function replaceURI(string memory newuri) public onlyOwner {
+		for (uint256 i = 1; i <= MAX_TOKEN_COUNT; i++) {
+			if (tokenSupply[i] > 0) {
+				bytes memory customUriBytes = bytes(customUri[i]);
+				if (customUriBytes.length == 0) {
+					// The current token uri is not custom...
+					string memory currentTokenURI = super.uri(i);
+					setCustomURI(i, currentTokenURI);
+				}
+			}
+		}
+		_setURI(newuri);
+	}
+
 	function mint(
 		address initialOwner,
 		uint256 id,
 		string memory uri,
 		bytes memory data
 	) public onlyOwner returns (uint256) {
-		require(!_exists(id), "token id already exists");
-		require(id > 0 && id <= MAX_TOKEN_COUNT, "token id out of bounds");
-
-		if (bytes(uri).length > 0) {
-			customUri[id] = uri;
-			emit URI(uri, id);
-		}
-
-		_mint(initialOwner, id, 1, data);
-
-		tokenSupply[id] = 1;
-
-		return id;
+		return _mintToken(initialOwner, id, uri, data);
 	}
 
 	/**
@@ -84,23 +97,7 @@ contract NFT is ERC1155Tradable {
 		for (uint256 i = 0; i < initialOwners.length; i++) {
 			address initialOwner = initialOwners[i];
 			uint256[] memory ids = idsPerOwner[i];
-			uint256[] memory quantities = new uint256[](ids.length); // https://fravoll.github.io/solidity-patterns/memory_array_building.html
-			for (uint256 j = 0; j < ids.length; j++) {
-				uint256 id = ids[j];
-				require(!_exists(id), "token id already exists");
-				require(
-					id > 0 && id <= MAX_TOKEN_COUNT,
-					"token id out of bounds"
-				);
-				tokenSupply[id] = 1;
-				quantities[j] = 1;
-
-				if (bytes(uri).length > 0) {
-					customUri[id] = uri;
-					emit URI(uri, id);
-				}
-			}
-			_mintBatch(initialOwner, ids, quantities, data);
+			_batchMintTokens(initialOwner, ids, uri, data);
 		}
 	}
 
@@ -115,25 +112,16 @@ contract NFT is ERC1155Tradable {
 		if (count > 1) {
 			// Batch Mint
 			uint256[] memory ids = new uint256[](count);
-			uint256[] memory quantities = new uint256[](count);
 			for (uint256 i = 0; i < count; i++) {
-				uint256 id = nextAvailableToken(); // No need to pass offset because setting totalSupply in the loop will prevent the same token return.
-				require(id > 0, "no more tokens");
-				require(!_exists(id), "token id already exists");
+				uint256 id = nextAvailableToken(i);
 				ids[i] = id;
-				quantities[i] = 1;
-				tokenSupply[id] = 1;
 			}
-			_mintBatch(initialOwner, ids, quantities, "");
+			_batchMintTokens(initialOwner, ids, "", "");
 		} else {
 			// Single Mint
 			uint256 id = nextAvailableToken();
 			require(id > 0, "no more tokens");
-			require(!_exists(id), "token id already exists");
-
-			_mint(initialOwner, id, 1, "");
-
-			tokenSupply[id] = 1;
+			_mintToken(initialOwner, id, "", "");
 		}
 	}
 
@@ -193,12 +181,22 @@ contract NFT is ERC1155Tradable {
 		uint256 token;
 		for (uint256 i = 1; i <= MAX_TOKEN_COUNT; i++) {
 			if (tokenSupply[i] == 0) {
+				bool isBlacklisted = false;
+				for (uint256 j = 0; j < _blacklistedTokenIds.length; j++) {
+					if (i == _blacklistedTokenIds[j]) {
+						isBlacklisted = true;
+						break;
+					}
+				}
+				if (isBlacklisted) {
+					continue;
+				}
 				if (offset > 0) {
 					offset = offset - 1;
-				} else {
-					token = i;
-					break;
+					continue;
 				}
+				token = i;
+				break;
 			}
 		}
 		return token;
@@ -206,5 +204,58 @@ contract NFT is ERC1155Tradable {
 
 	function nextAvailableToken() internal view returns (uint256) {
 		return nextAvailableToken(0);
+	}
+
+	function _prepareToken(uint256 id, string memory uri) private {
+		require(!_exists(id), "token id already exists");
+		require(id > 0 && id <= MAX_TOKEN_COUNT, "token id out of bounds");
+
+		if (bytes(uri).length > 0) {
+			customUri[id] = uri;
+			emit URI(uri, id);
+		}
+
+		tokenSupply[id] = 1;
+	}
+
+	/**
+	 * @dev Mint a new token type and assigns _initialSupply to an address
+	 * @param initialOwner address of the first owner of the token
+	 * @param id The id of the token to create (must not currenty exist).
+	 * @param uri Optional URI for this token type
+	 * @param data Data to pass if receiver is contract
+	 * @return The newly created token ID
+	 */
+	function _mintToken(
+		address initialOwner,
+		uint256 id,
+		string memory uri,
+		bytes memory data
+	) private returns (uint256) {
+		_prepareToken(id, uri);
+		_mint(initialOwner, id, 1, data);
+		return id;
+	}
+
+	/**
+	 * @dev Mint new tokens for each id in _ids
+	 * @param initialOwner          The address to mint tokens to
+	 * @param ids            Array of ids to mint for owner.
+	 * @param uri                    The Custom URI to set against each newly created Token
+	 * @param data                   Data to pass if receiver is contract
+	 */
+	function _batchMintTokens(
+		address initialOwner,
+		uint256[] memory ids,
+		string memory uri,
+		bytes memory data
+	) private {
+		uint256[] memory quantities = new uint256[](ids.length); // https://fravoll.github.io/solidity-patterns/memory_array_building.html
+		for (uint256 j = 0; j < ids.length; j++) {
+			uint256 id = ids[j];
+			_prepareToken(id, uri);
+			quantities[j] = 1;
+		}
+		_mintBatch(initialOwner, ids, quantities, data);
 	}
 }
