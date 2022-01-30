@@ -17,6 +17,7 @@
 		"paint": "node ./scripts/avatar-paint",
 		"filter": "node ./scripts/avatar-filter",
 		"generate": "node ./scripts/avatar-generator",
+		"split": "node ./scripts/extras/split-avatars",
 		"lint": "eslint -c ./.eslintrc.js \"{scripts,test}/**/*.js\" && solhint contracts/**/*.sol",
 		"format": "prettier --write {scripts,test}/**/*.js contracts/**/*.sol"
 	},
