@@ -144,7 +144,7 @@ contract NFT is ERC1155Tradable {
 		}
 	}
 
-	function _prepareToken(uint256 id, string memory uri) private {
+	function _prepareToken(uint256 id, string memory uri) internal {
 		require(!_exists(id), "token id already exists");
 		require(id > 0 && id <= MAX_TOKEN_COUNT, "token id out of bounds");
 

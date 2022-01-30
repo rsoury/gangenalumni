@@ -9,6 +9,7 @@ const tokenURI =
 	"https://gangenalumni.s3.us-east-2.amazonaws.com/rinkeby/data/{id}.json";
 const contractURI =
 	"https://gangenalumni.s3.us-east-2.amazonaws.com/rinkeby/data/contract.json";
+const PUBLIC_MINT_PRICE = 0.1;
 
 describe("NFT Smart Contract Tests", () => {
 	beforeEach(async () => {
@@ -26,7 +27,10 @@ describe("NFT Smart Contract Tests", () => {
 			tokenURI
 		);
 		const NFTPublicMinter = await ethers.getContractFactory("NFTPublicMinter");
-		npm = await NFTPublicMinter.deploy(nft.address, []);
+		npm = await NFTPublicMinter.deploy(nft.address);
+		const [owner] = await ethers.getSigners();
+		const tx = await nft.connect(owner).setMinter(npm.address);
+		await tx.wait();
 	});
 
 	it("Token is minted successfully", async () => {
@@ -50,7 +54,7 @@ describe("NFT Smart Contract Tests", () => {
 		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
 
 		const overrides = {
-			value: ethers.utils.parseEther("0.1")
+			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		};
 		await npm.connect(account).publicMint(1, overrides);
 		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
@@ -172,7 +176,7 @@ describe("NFT Smart Contract Tests", () => {
 		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
 
 		const overrides = {
-			value: ethers.utils.parseEther("0.1")
+			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		};
 		await expectThrow(
 			npm.connect(account).publicMint(10, overrides),
@@ -206,7 +210,18 @@ describe("NFT Smart Contract Tests", () => {
 
 		// const events = await nft.queryFilter("TransferBatch");
 		// const supply = await nft.totalSupply(10000);
-		// console.log(events[events.length - 1].args.ids);
+		// // console.log(events[events.length - 1].args.ids);
+		// // Collect all ids from event into a single array, then check which are missing.
+		// const eventIds = events.reduce((a, event) => {
+		// 	a = [...a, ...event.args.ids.map((id) => id.toNumber())];
+		// 	return a;
+		// }, []);
+		// const missing = [];
+		// _.range(1, 10000).forEach((id) => {
+		// 	if (!eventIds.includes(id)) {
+		// 		missing.push(id);
+		// 	}
+		// });
 		// console.log({
 		// 	numOfEvents: events.length,
 		// 	supply10000: supply.toNumber(),
@@ -221,30 +236,19 @@ describe("NFT Smart Contract Tests", () => {
 		// 		}, 0);
 		// 		return a;
 		// 	}, 0),
-		// 	totalIdSum: _.range(1, 10000).reduce((a, c) => {
+		// 	totalIdSum: _.range(1, 10001).reduce((a, c) => {
 		// 		a += c;
 		// 		return a;
-		// 	}, 0)
+		// 	}, 0),
+		// 	missing
 		// });
-		// // Collect all ids from event into a single array, then check which are missing.
-		// const eventIds = events.reduce((a, event) => {
-		// 	a = [...a, ...event.args.ids.map((id) => id.toNumber())];
-		// 	return a;
-		// }, []);
-		// const missing = [];
-		// _.range(1, 10000).forEach((id) => {
-		// 	if (!eventIds.includes(id)) {
-		// 		missing.push(id);
-		// 	}
-		// });
-		// console.log({ missing });
 
-		const overrides = {
-			value: ethers.utils.parseEther("0.1"), // (`${0.1 * 21}`),
-			gasLimit: 30000000
-		};
 		await expectThrow(
-			npm.connect(account).publicMint(1, overrides),
+			npm.connect(account).publicMint(1, {
+				// gasLimit: 30000000,
+				// gasPrice: 30000000,
+				value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`) // (`${0.1 * 21}`),
+			}),
 			"no more tokens"
 		);
 	});
@@ -297,7 +301,7 @@ describe("NFT Smart Contract Tests", () => {
 		await tx.wait();
 
 		await npm.connect(account).publicMint(1, {
-			value: ethers.utils.parseEther("0.1")
+			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		});
 		expect(await nft.balanceOf(account.address, 11)).to.equal(1);
 
@@ -309,7 +313,7 @@ describe("NFT Smart Contract Tests", () => {
 		await tx2.wait();
 
 		await npm.connect(account).publicMint(2, {
-			value: ethers.utils.parseEther("0.2")
+			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE * 2}`)
 		});
 		expect(await nft.balanceOf(account.address, 13)).to.equal(1);
 		expect(await nft.balanceOf(account.address, 16)).to.equal(1);
@@ -327,7 +331,7 @@ describe("NFT Smart Contract Tests", () => {
 		expect(tx.hash).to.be.a("string");
 
 		await npm.connect(account).publicMint(1, {
-			value: ethers.utils.parseEther("0.1")
+			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		});
 		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
 		expect(await nft.uri(1)).to.equal(uri);

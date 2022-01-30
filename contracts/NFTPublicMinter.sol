@@ -32,7 +32,9 @@ contract NFTPublicMinter is Ownable {
 		onlyOwner
 	{
 		for (uint256 i = 1; i <= MAX_TOKEN_COUNT; i++) {
-			_blacklistedTokenIds[i] = false;
+			if (_blacklistedTokenIds[i]) {
+				_blacklistedTokenIds[i] = false;
+			}
 		}
 		for (uint256 i = 0; i < tokenIds.length; i++) {
 			_blacklistedTokenIds[tokenIds[i]] = true;
@@ -58,6 +60,7 @@ contract NFTPublicMinter is Ownable {
 			uint256[] memory ids = new uint256[](count);
 			for (uint256 i = 0; i < count; i++) {
 				uint256 id = nextAvailableToken(i);
+				require(id > 0, "no more tokens");
 				ids[i] = id;
 			}
 			nft.batchMint(initialOwner, ids, uri, "");

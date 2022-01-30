@@ -1,9 +1,9 @@
 // Script to public mint before withdrawing -- more for testing purposes.
 
-const _ = require("lodash");
+const { types } = require("hardhat/config");
 
 task("public-mint", "Public/Payment-based NFT token Mint to address")
-	.addOptionalParam("count", "Number of tokens to mint", "1")
+	.addOptionalParam("count", "Number of tokens to mint", 1, types.int)
 	.setAction(async (taskArgs, { ethers, deployments }) => {
 		const npmDeployment = await deployments.get("NFTPublicMinter");
 		const NFTPublicMinter = await ethers.getContractFactory("NFTPublicMinter");
@@ -12,12 +12,7 @@ task("public-mint", "Public/Payment-based NFT token Mint to address")
 		const NFT = await ethers.getContractFactory("NFT");
 		const nft = await NFT.attach(nftDeployment.address);
 
-		let { count } = taskArgs;
-
-		count = parseInt(count, 10);
-		if (!_.isNumber(count)) {
-			throw new Error("Count of tokens to mint must be a number");
-		}
+		const { count } = taskArgs;
 
 		const [owner] = await ethers.getSigners();
 

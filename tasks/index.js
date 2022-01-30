@@ -5,3 +5,5 @@ require("./batch-mint");
 require("./public-mint");
 require("./withdraw");
 require("./balance");
+require("./blacklist");
+require("./default-public-mint-uri");
