@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const _ = require("lodash");
 const expectThrow = require("./helpers/expect-throw");
+const nextAvailableTokens = require("../helpers/next-available-tokens");
 
 let nft;
 let npm;
@@ -56,7 +57,7 @@ describe("NFT Smart Contract Tests", () => {
 		const overrides = {
 			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		};
-		await npm.connect(account).publicMint(1, overrides);
+		await npm.connect(account).publicMint([1], overrides);
 		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
 	});
 
@@ -66,7 +67,7 @@ describe("NFT Smart Contract Tests", () => {
 			value: ethers.utils.parseEther("0.01")
 		};
 		await expectThrow(
-			npm.connect(account).publicMint(1, overrides),
+			npm.connect(account).publicMint([1], overrides),
 			"invalid value"
 		);
 	});
@@ -151,7 +152,7 @@ describe("NFT Smart Contract Tests", () => {
 		const overrides = {
 			value: ethers.utils.parseEther("1")
 		};
-		const tx = await npm.connect(account).publicMint(10, overrides);
+		const tx = await npm.connect(account).publicMint(_.range(1, 11), overrides);
 		const events = await nft.queryFilter("TransferBatch");
 		const event = events.find(
 			({ args, transactionHash }) =>
@@ -179,83 +180,9 @@ describe("NFT Smart Contract Tests", () => {
 			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		};
 		await expectThrow(
-			npm.connect(account).publicMint(10, overrides),
+			npm.connect(account).publicMint(_.range(1, 11), overrides),
 			"invalid value"
 		);
-	});
-
-	it("Token public/payment-based batch mint throws error for 'no more tokens'", async function () {
-		this.timeout(60000);
-		const [owner, , , account] = await ethers.getSigners();
-		expect(await nft.balanceOf(account.address, 1)).to.equal(0);
-
-		const promises = _.range(20).map((index) => {
-			return nft.connect(owner).batchMintToMany(
-				[owner.address],
-				// [_.range(index * 1000 + 1, index * 1000 + 1000)],
-				[_.range(index * 500 + 1, index * 500 + 501)], // _.range(1, 501) = [1...500] -- second parameter is the number of elements, rather than the end element.
-				"",
-				[],
-				{
-					gasLimit: 30000000
-				}
-			);
-		});
-		// const txs = [];
-		for (let i = 0; i < promises.length; i += 1) {
-			// const tx = await promises[i];
-			// txs.push(tx);
-			await promises[i];
-		}
-
-		// const events = await nft.queryFilter("TransferBatch");
-		const supply = await nft.totalSupply(10000);
-		expect(supply).to.be.equal(1);
-		// // console.log(events[events.length - 1].args.ids);
-		// // Collect all ids from event into a single array, then check which are missing.
-		// const eventIds = events.reduce((a, event) => {
-		// 	a = [...a, ...event.args.ids.map((id) => id.toNumber())];
-		// 	return a;
-		// }, []);
-		// const missing = [];
-		// _.range(1, 10000).forEach((id) => {
-		// 	if (!eventIds.includes(id)) {
-		// 		missing.push(id);
-		// 	}
-		// });
-		// console.log({
-		// 	numOfEvents: events.length,
-		// 	supply10000: supply.toNumber(),
-		// 	totalTokenCount: events.reduce((acc, currentValue) => {
-		// 		acc += currentValue.args.ids.length;
-		// 		return acc;
-		// 	}, 0),
-		// 	txsIdSum: events.reduce((a, event) => {
-		// 		a += event.args.ids.reduce((idA, id) => {
-		// 			idA += id.toNumber();
-		// 			return idA;
-		// 		}, 0);
-		// 		return a;
-		// 	}, 0),
-		// 	totalIdSum: _.range(1, 10001).reduce((a, c) => {
-		// 		a += c;
-		// 		return a;
-		// 	}, 0),
-		// 	missing
-		// });
-
-		await npm.connect(account).publicMint(1, {
-			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
-		});
-		expect(await nft.balanceOf(account.address, 1)).to.equal(1);
-		// await expectThrow(
-		// 	npm.connect(account).publicMint(1, {
-		// 		// gasLimit: 30000000,
-		// 		// gasPrice: 30000000,
-		// 		value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`) // (`${0.1 * 21}`),
-		// 	}),
-		// 	"no more tokens"
-		// );
 	});
 
 	it("Token permanence event emits successfully", async () => {
@@ -305,7 +232,8 @@ describe("NFT Smart Contract Tests", () => {
 
 		await tx.wait();
 
-		await npm.connect(account).publicMint(1, {
+		const idsToMint = await nextAvailableTokens(nft, npm);
+		await npm.connect(account).publicMint(idsToMint, {
 			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		});
 		expect(await nft.balanceOf(account.address, 11)).to.equal(1);
@@ -317,7 +245,8 @@ describe("NFT Smart Contract Tests", () => {
 		const tx2 = await npm.connect(owner).setBlacklistedTokenIds(bIds);
 		await tx2.wait();
 
-		await npm.connect(account).publicMint(2, {
+		const idsToMint2 = await nextAvailableTokens(nft, npm, 2);
+		await npm.connect(account).publicMint(idsToMint2, {
 			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE * 2}`)
 		});
 		expect(await nft.balanceOf(account.address, 13)).to.equal(1);
@@ -335,7 +264,7 @@ describe("NFT Smart Contract Tests", () => {
 		const tx = await npm.connect(owner).setDefaultPublicMintCustomURI(uri);
 		expect(tx.hash).to.be.a("string");
 
-		await npm.connect(account).publicMint(1, {
+		await npm.connect(account).publicMint([1], {
 			value: ethers.utils.parseEther(`${PUBLIC_MINT_PRICE}`)
 		});
 		expect(await nft.balanceOf(account.address, 1)).to.equal(1);

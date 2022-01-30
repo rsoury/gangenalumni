@@ -1,6 +1,7 @@
 // Script to public mint before withdrawing -- more for testing purposes.
 
 const { types } = require("hardhat/config");
+const nextAvailableTokens = require("../helpers/next-available-tokens");
 
 task("public-mint", "Public/Payment-based NFT token Mint to address")
 	.addOptionalParam("count", "Number of tokens to mint", 1, types.int)
@@ -17,8 +18,16 @@ task("public-mint", "Public/Payment-based NFT token Mint to address")
 		const [owner] = await ethers.getSigners();
 
 		const value = 0.1 * count;
-		console.log(`Minting to ${owner.address} for ${value} ETH...`);
-		const tx = await npm.connect(owner).publicMint(count, {
+
+		// JS to determine the next available tokens based on emitted events...
+		const idsToMint = await nextAvailableTokens(nft, npm, count);
+
+		console.log(
+			`Minting tokens ${idsToMint.join(", ")} to ${
+				owner.address
+			} for ${value} ETH...`
+		);
+		const tx = await npm.connect(owner).publicMint(idsToMint, {
 			value: ethers.utils.parseEther(`${value}`)
 		});
 		console.log(`Transaction created: ${tx.hash}`);

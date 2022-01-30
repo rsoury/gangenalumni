@@ -49,25 +49,36 @@ contract NFTPublicMinter is Ownable {
 	 * @dev Publicly accessible: Mint new tokens to the contract caller based on the amount of value sent.
 	 * Each token value is hard coded
 	 */
-	function publicMint(uint256 count) public payable {
-		require(msg.value == PRICE * count, "NFT: invalid value");
-		require(count > 0, "NFT: mint amount must be greater than 0");
+	function publicMint(uint256[] memory ids) public payable {
+		require(
+			msg.value == PRICE * ids.length,
+			"NFTPublicMinter: invalid value"
+		);
+		require(
+			ids.length > 0,
+			"NFTPublicMinter: mint amount must be greater than 0"
+		);
 		address initialOwner = _msgSender();
 		string memory uri = _defaultPublicMintCustomURI;
 		NFT nft = NFT(_nftAddress);
-		if (count > 1) {
+		if (ids.length > 1) {
 			// Batch Mint
-			uint256[] memory ids = new uint256[](count);
-			for (uint256 i = 0; i < count; i++) {
-				uint256 id = nextAvailableToken(i);
-				require(id > 0, "no more tokens");
+			for (uint256 i = 0; i < ids.length; i++) {
+				uint256 id = ids[i];
+				require(
+					_blacklistedTokenIds[id] == false,
+					"NFTPublicMinter: Cannot mint blacklisted Token Id"
+				);
 				ids[i] = id;
 			}
 			nft.batchMint(initialOwner, ids, uri, "");
 		} else {
 			// Single Mint
-			uint256 id = nextAvailableToken();
-			require(id > 0, "no more tokens");
+			uint256 id = ids[0];
+			require(
+				_blacklistedTokenIds[id] == false,
+				"NFTPublicMinter: Cannot mint blacklisted Token Id"
+			);
 			nft.mint(initialOwner, id, uri, "");
 		}
 	}
@@ -79,35 +90,5 @@ contract NFTPublicMinter is Ownable {
 		// send all Ether to payee
 		(bool sent, ) = payee.call{ value: address(this).balance }("");
 		require(sent, "Failed to withdraw Ether");
-	}
-
-	function nextAvailableToken(uint256 offset)
-		internal
-		view
-		returns (uint256)
-	{
-		uint256 token;
-		NFT nft = NFT(_nftAddress);
-		uint256[] memory supplyStatus = nft.supplyStatus();
-		for (uint256 i = 0; i < MAX_TOKEN_COUNT; i++) {
-			uint256 id = i + 1;
-			if (_blacklistedTokenIds[id] == true) {
-				continue;
-			}
-			if (supplyStatus[i] > 0) {
-				continue;
-			}
-			if (offset > 0) {
-				offset = offset - 1;
-				continue;
-			}
-			token = id;
-			break;
-		}
-		return token;
-	}
-
-	function nextAvailableToken() internal view returns (uint256) {
-		return nextAvailableToken(0);
 	}
 }
