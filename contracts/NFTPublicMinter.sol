@@ -88,19 +88,21 @@ contract NFTPublicMinter is Ownable {
 	{
 		uint256 token;
 		NFT nft = NFT(_nftAddress);
-		for (uint256 i = 1; i <= MAX_TOKEN_COUNT; i++) {
-			uint256 tokenSupply = nft.tokenSupply(i);
-			if (tokenSupply == 0) {
-				if (_blacklistedTokenIds[i] == true) {
-					continue;
-				}
-				if (offset > 0) {
-					offset = offset - 1;
-					continue;
-				}
-				token = i;
-				break;
+		uint256[] memory supplyStatus = nft.supplyStatus();
+		for (uint256 i = 0; i < MAX_TOKEN_COUNT; i++) {
+			uint256 id = i + 1;
+			if (_blacklistedTokenIds[id] == true) {
+				continue;
 			}
+			if (supplyStatus[i] > 0) {
+				continue;
+			}
+			if (offset > 0) {
+				offset = offset - 1;
+				continue;
+			}
+			token = id;
+			break;
 		}
 		return token;
 	}

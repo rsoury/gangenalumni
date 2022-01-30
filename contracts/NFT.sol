@@ -144,6 +144,18 @@ contract NFT is ERC1155Tradable {
 		}
 	}
 
+	/**
+	 * @dev Returns an array of quantities representing the supply status of the entire collection
+	 * @return array of quantities
+	 */
+	function supplyStatus() public view returns (uint256[] memory) {
+		uint256[] memory status = new uint256[](MAX_TOKEN_COUNT);
+		for (uint256 i = 0; i < MAX_TOKEN_COUNT; i++) {
+			status[i] = tokenSupply[i + 1]; // Increase index in mapping to use Token ID, however, array starts at index 0
+		}
+		return status;
+	}
+
 	function _prepareToken(uint256 id, string memory uri) internal {
 		require(!_exists(id), "token id already exists");
 		require(id > 0 && id <= MAX_TOKEN_COUNT, "token id out of bounds");
