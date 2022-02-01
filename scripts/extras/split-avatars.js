@@ -6,7 +6,6 @@ require("dotenv").config();
 const path = require("path");
 const chalk = require("chalk");
 const mkdirp = require("mkdirp");
-const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
@@ -32,8 +31,6 @@ const {
 
 const { input, facedata: faceDatasetDir, by } = options;
 const outputDir = stripTrailingSlash(options.output || input);
-
-debugLog(`Output Directory: ${outputDir}`);
 
 // Create dir
 const outputDirBy = path.join(`${outputDir}-split`, by);

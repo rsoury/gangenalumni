@@ -67,6 +67,7 @@
 		"googleapis": "^89.0.0",
 		"humanparser": "^2.6.0",
 		"image-size": "^1.0.0",
+		"imghash": "^0.0.9",
 		"interval-promise": "^1.4.0",
 		"is-numeric": "^0.0.9",
 		"jsonfile": "^6.1.0",

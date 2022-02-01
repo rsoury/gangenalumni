@@ -38,6 +38,9 @@ module.exports.getImages = async (input, extensions = "jpeg,jpg,png") => {
 	return images;
 };
 
+module.exports.getName = (filePath) =>
+	path.basename(filePath).split(".").slice(0, -1).join(".");
+
 module.exports.copy = async (source, destination, options = {}) =>
 	new Promise((resolve, reject) => {
 		ncp(source, destination, options, (err) => {

@@ -37,6 +37,27 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
+"@canvas/image-data@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@canvas/image-data/-/image-data-1.0.0.tgz#3bd2cd856e13fc9e2c25feff360a4056857b0367"
+  integrity sha512-BxOqI5LgsIQP1odU5KMwV9yoijleOPzHL18/YvNqF9KFSGF2K/DLlYAbDQsWqd/1nbaFuSkYD/191dpMtNh4vw==
+
+"@canvas/image@^1.0.0":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@canvas/image/-/image-1.0.1.tgz#02bdd4bdf95352b1385e1bd3412fccb31f9269fc"
+  integrity sha512-nQ6Qt/marzeQkFikxw32qMep5Rs1U/7DdjqHlCn8ck78IX56CFnXjdfRCXOiM4kx8yvS4SmcPXuJjfpczRjFqA==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+    "@cwasm/jpeg-turbo" "^0.1.1"
+    "@cwasm/lodepng" "^0.1.2"
+    "@cwasm/nsbmp" "^0.1.0"
+    "@cwasm/nsgif" "^0.1.0"
+    "@cwasm/webp" "^0.1.3"
+    fast-base64-decode "^1.0.0"
+    fast-base64-encode "^1.0.0"
+    fast-base64-length "^1.0.0"
+    simple-get "^3.1.0"
+
 "@cliqz/adblocker-content@^1.22.6", "@cliqz/adblocker-content@^1.23.0":
   version "1.23.0"
   resolved "https://registry.yarnpkg.com/@cliqz/adblocker-content/-/adblocker-content-1.23.0.tgz#4417a28d6018138956898efa141c9e6f52c9ec34"
@@ -71,6 +92,41 @@
     "@types/chrome" "^0.0.159"
     "@types/firefox-webext-browser" "^94.0.0"
     tldts-experimental "^5.6.21"
+
+"@cwasm/jpeg-turbo@^0.1.1":
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/@cwasm/jpeg-turbo/-/jpeg-turbo-0.1.3.tgz#4f5e840d2fc58de9e876738456cd1bcb9c3424a3"
+  integrity sha512-FkZxwwC6r4zhzlqM0nYGaMj/MDSrZPxLOdPdM6ySlgsMfOpNAZcLQkpNF4jP+DmsuUvRoeUD0YSMBvg3jYfK6w==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+
+"@cwasm/lodepng@^0.1.2":
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/@cwasm/lodepng/-/lodepng-0.1.6.tgz#9e8a732629c5e8e1169149944f27dfe0f689baec"
+  integrity sha512-5ypNnlvlOpnSAYsTihEGt97vpSBM2TSuz4kN4hj7saKq5OQYCffmz5yH2ZYKnwETjjXCG8UeMm0TtF1KIihbXQ==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+
+"@cwasm/nsbmp@^0.1.0":
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/@cwasm/nsbmp/-/nsbmp-0.1.2.tgz#521479dbcbf2bf2f742f0dd540a8aa9a930b3f9c"
+  integrity sha512-ZQGNDOI9ZxokqbNPmvcLKR8gBhfHjeFVuqE2eYysrbGiraQ93KeeIVrtiGKOMLW2JJOq9PbGBU0NX47qkpKWWA==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+
+"@cwasm/nsgif@^0.1.0":
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/@cwasm/nsgif/-/nsgif-0.1.2.tgz#0f9687be119f982db1c64340dd2db017bf00cefe"
+  integrity sha512-LOD5HlL0O5jpnIAl+dLSZcB3v0RBNBjtoaymdCEPe2kyKzaP20BF+jy/QUyOZogQsgMVjusZES3tgwwoiiJ2rA==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+
+"@cwasm/webp@^0.1.3":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@cwasm/webp/-/webp-0.1.5.tgz#b61014319aa9bb70b9f6d8a30f2838fed21779d1"
+  integrity sha512-ceIZQkyxK+s7mmItNcWqqHdOBiJAxYxTnrnPNgUNjldB1M9j+Bp/3eVIVwC8rUFyN/zoFwuT0331pyY3ackaNA==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
 
 "@ensdomains/ens@^0.4.4":
   version "0.4.5"
@@ -2253,6 +2309,11 @@ blakejs@^1.1.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/blakejs/-/blakejs-1.1.1.tgz#bf313053978b2cd4c444a48795710be05c785702"
   integrity sha512-bLG6PHOCZJKNshTjGRBvET0vTciwQE6zFKOKKXPDJfwFBd4Ac0yBfPZqcGvGJap50l7ktvlpFqc2jGVaUgbJgg==
+
+blockhash-core@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/blockhash-core/-/blockhash-core-0.1.0.tgz#dc25bd864b5af05c33e4266fb4d8f4e619462d04"
+  integrity sha512-Cv7BgBo0jjVPaeuel4cvxf9LqIGsYNIPz9DAGvvrF9LRlEq9Q3HXu+S8bklPCae0sCxAXic4HGMoImf3FeO3Nw==
 
 bluebird@^3.5.0, bluebird@^3.5.2:
   version "3.7.2"
@@ -4629,6 +4690,21 @@ fake-merkle-patricia-tree@^1.0.1:
   dependencies:
     checkpoint-store "^1.1.0"
 
+fast-base64-decode@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/fast-base64-decode/-/fast-base64-decode-1.0.0.tgz#b434a0dd7d92b12b43f26819300d2dafb83ee418"
+  integrity sha512-qwaScUgUGBYeDNRnbc/KyllVU88Jk1pRHPStuF/lO7B0/RTRLj7U0lkdTAutlBblY08rwZDff6tNU9cjv6j//Q==
+
+fast-base64-encode@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/fast-base64-encode/-/fast-base64-encode-1.0.0.tgz#883945eb67e139dbf5a877bcca57a89e6824c7d4"
+  integrity sha512-z2XCzVK4fde2cuTEHu2QGkLD6BPtJNKJPn0Z7oINvmhq/quUuIIVPYKUdN0gYeZqOyurjJjBH/bUzK5gafyHvw==
+
+fast-base64-length@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/fast-base64-length/-/fast-base64-length-1.0.0.tgz#080ec166a8ef6d77f8f612d9ce629dcaceb13a4a"
+  integrity sha512-MV+/ioblHx6SMjc/1l4EAnRJyAku6+6DxZ6RW0FoFCF1Aol/Ldb6FqwE3Kn3Ju1aam2m1KCIVoCljhgcG+Umzg==
+
 fast-deep-equal@^3.1.1, fast-deep-equal@^3.1.3:
   version "3.1.3"
   resolved "https://registry.yarnpkg.com/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz#3a7d56b559d6cbc3eb512325244e619a65c6c525"
@@ -4711,6 +4787,11 @@ file-entry-cache@^6.0.1:
   integrity sha512-7Gps/XWymbLk2QLYK4NzpMOrYjMhdIxXuIvy2QBsLE6ljuodKvdkWs/cpyJJ3CVIVpH0Oi1Hvg1ovbMzLdFBBg==
   dependencies:
     flat-cache "^3.0.4"
+
+file-type@^10.10.0:
+  version "10.11.0"
+  resolved "https://registry.yarnpkg.com/file-type/-/file-type-10.11.0.tgz#2961d09e4675b9fb9a3ee6b69e9cd23f43fd1890"
+  integrity sha512-uzk64HRpUZyTGZtVuvrjP0FYxzQrBf4rojot6J65YMEbwBLB0CWm0CLojVpwpmFmxcE/lkvYICgfcGozbBq6rw==
 
 fill-range@^4.0.0:
   version "4.0.0"
@@ -5734,6 +5815,23 @@ image-size@^1.0.0:
   dependencies:
     queue "6.0.2"
 
+image-type@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/image-type/-/image-type-4.1.0.tgz#72a88d64ff5021371ed67b9a466442100be57cd1"
+  integrity sha512-CFJMJ8QK8lJvRlTCEgarL4ro6hfDQKif2HjSvYCdQZESaIPV4v9imrf7BQHK+sQeTeNeMpWciR9hyC/g8ybXEg==
+  dependencies:
+    file-type "^10.10.0"
+
+imghash@^0.0.9:
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/imghash/-/imghash-0.0.9.tgz#cb04704c5100ab9836eb5743c42ccfc13e159ad4"
+  integrity sha512-fvxoWZVlx2dSQQMitTFHVFooD/ODf57jzmZWjRiHQ4qYb6kKcydkV2IvcWa8+efuAwYn3n5/cJFMdpZ6D88yew==
+  dependencies:
+    "@canvas/image" "^1.0.0"
+    blockhash-core "^0.1.0"
+    image-type "^4.1.0"
+    jpeg-js "^0.4.1"
+
 immediate@^3.2.3:
   version "3.3.0"
   resolved "https://registry.yarnpkg.com/immediate/-/immediate-3.3.0.tgz#1aef225517836bcdf7f2a2de2600c79ff0269266"
@@ -6239,6 +6337,11 @@ jmespath@0.15.0:
   version "0.15.0"
   resolved "https://registry.yarnpkg.com/jmespath/-/jmespath-0.15.0.tgz#a3f222a9aae9f966f5d27c796510e28091764217"
   integrity sha1-o/Iiqarp+Wb10nx5ZRDigJF2Qhc=
+
+jpeg-js@^0.4.1:
+  version "0.4.3"
+  resolved "https://registry.yarnpkg.com/jpeg-js/-/jpeg-js-0.4.3.tgz#6158e09f1983ad773813704be80680550eff977b"
+  integrity sha512-ru1HWKek8octvUHFHvE5ZzQ1yAsJmIvRdGWvSoKV52XKyuyYA437QWDttXT8eZXDSbuMpHlLzPDZUPd6idIz+Q==
 
 js-sha3@0.8.0, js-sha3@^0.8.0:
   version "0.8.0"
