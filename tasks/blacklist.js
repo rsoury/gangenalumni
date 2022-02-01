@@ -30,7 +30,10 @@ task("blacklist", "Blacklist Token IDs from being minted publicly")
 		if (!shouldClear) {
 			if (!_.isEmpty(file)) {
 				const pathToFile = path.join(process.cwd(), file);
-				tokenIds = await jsonfile.readFile(pathToFile);
+				const jsonData = await jsonfile.readFile(pathToFile);
+				tokenIds = jsonData.map((record) =>
+					typeof record === "object" ? record.id : record
+				);
 			} else if (!_.isEmpty(ids)) {
 				tokenIds = ids
 					.split(",")

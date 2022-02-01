@@ -187,7 +187,7 @@ mkdirp.sync(outputDir);
 			const nameData = files.name ? await jsonfile.readFile(files.name) : {};
 
 			const { name } = nameData;
-			// // TODO: We're going to need to conditionally deploy the images to Pinata/IPFS or S3 -- to construct the images
+
 			let image = "";
 			if (imageUrl) {
 				image = imageUrl.replaceAll("{ID}", id).replaceAll("{id}", id);
