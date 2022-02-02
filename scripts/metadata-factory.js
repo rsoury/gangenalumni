@@ -241,6 +241,10 @@ mkdirp.sync(outputDir);
 			// 	facing = "Right";
 			// }
 			attributes.push({
+				trait_type: "Cast Member #",
+				value: id
+			});
+			attributes.push({
 				trait_type: "Gender",
 				value: gender
 			});

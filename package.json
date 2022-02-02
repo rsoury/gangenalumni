@@ -11,6 +11,7 @@
 		"datasets:name": "node ./scripts/produce-datasets/name",
 		"datasets:ethnicity": "node ./scripts/produce-datasets/ethnicity",
 		"datasets:face": "node ./scripts/produce-datasets/face",
+		"datasets:label": "node ./scripts/produce-datasets/label",
 		"enhance": "./bin/enhance",
 		"accessorise": "node ./scripts/avatar-accessorise",
 		"modulate": "node ./scripts/avatar-modulate",
@@ -45,6 +46,7 @@
 		"solhint-plugin-prettier": "^0.0.5"
 	},
 	"dependencies": {
+		"@google-cloud/vision": "^2.4.2",
 		"@openzeppelin/contracts": "^4.4.1",
 		"aws-sdk": "^2.1018.0",
 		"axios": "^0.24.0",
