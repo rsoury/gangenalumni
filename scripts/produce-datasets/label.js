@@ -78,19 +78,6 @@ const client = new vision.ImageAnnotatorClient({
 
 			await jsonfile.writeFile(outputFile, response);
 
-			// Produce an aggregate of all labels assigned to all images for manual parsing...
-			let allLabels = [];
-			const allLabelsFile = path.join(outputDir, `all-labels.json`);
-			try {
-				allLabels = (await jsonfile.readFile(allLabelsFile)) || [];
-			} catch (e) {
-				// Will throw if file does not exist
-			}
-			await jsonfile.writeFile(
-				allLabelsFile,
-				_.uniq([...allLabels, ...labels.map((label) => label.description)])
-			);
-
 			return { image, output: outputFile };
 		},
 		{
