@@ -294,9 +294,9 @@ mkdirp.sync(outputDir);
 
 			enhancements.forEach((e) => {
 				if (e.name === "Beards") {
-					let value = e.type;
-					if (typeof facialHairMapping[e.type] !== "undefined") {
-						value = facialHairMapping[e.type];
+					let value = _.startCase(e.type);
+					if (typeof facialHairMapping[value] !== "undefined") {
+						value = facialHairMapping[value];
 					}
 					attributes.push({
 						trait_type: "Facial Hair",

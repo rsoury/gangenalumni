@@ -70,6 +70,7 @@
 		"imghash": "^0.0.9",
 		"interval-promise": "^1.4.0",
 		"is-numeric": "^0.0.9",
+		"jimp": "^0.16.1",
 		"jsonfile": "^6.1.0",
 		"lodash": "^4.17.21",
 		"mkdirp": "^1.0.4",

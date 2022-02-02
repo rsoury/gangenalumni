@@ -77,27 +77,56 @@ console.log(chalk.yellow(`Output directory created ...`));
 			const bottomHalf = await sharp(image)
 				.extract({
 					top: dimensions.height / 2,
-					left: 0,
-					width: dimensions.width,
+					left: dimensions.width * 0.2,
+					width: dimensions.width - dimensions.width * 0.4,
 					height: dimensions.height / 2
 				})
 				.toBuffer();
+			// await sharp(image)
+			// 	.extract({
+			// 		top: 0,
+			// 		left: 0,
+			// 		width: dimensions.width,
+			// 		height: dimensions.height / 2
+			// 	})
+			// 	.toFile(path.join(outputDir, `TOP_${path.basename(image)}`));
+			// await sharp(image)
+			// 	.extract({
+			// 		top: dimensions.height / 2,
+			// 		left: 0,
+			// 		width: dimensions.width,
+			// 		height: dimensions.height / 2
+			// 	})
+			// 	.toFile(path.join(outputDir, `BOTTOM_${path.basename(image)}`));
 
 			console.log(chalk.grey(`[${image}] Source image halved ...`));
 
 			const topHash = await imghash.hash(topHalf);
 			const match = {}; // distance, id -- to populate this object.
 			for (let i = 0; i < compareImages.length; i += 1) {
-				const compareImgPath = compareImages[i];
-				const cmpHash = await imghash.hash(compareImgPath);
+				const imgPath = compareImages[i];
+				const dim = await sizeOf(imgPath);
+				const img = await sharp(imgPath)
+					.extract({
+						top: 0,
+						left: 0,
+						width: dim.width,
+						height: dim.height / 2
+					})
+					.toBuffer();
+				const cmpHash = await imghash.hash(img);
 				const distance = levenDistance(topHash, cmpHash);
+				const id = getName(imgPath);
 				if (
 					distance < match.distance ||
 					typeof match.distance === "undefined"
 				) {
 					match.distance = distance;
-					match.id = getName(compareImgPath);
+					match.id = id;
 				}
+				console.log(
+					chalk.grey(`[${image}] Compare with ${path.basename(imgPath)} ...`)
+				);
 			}
 
 			if (match.id) {
@@ -110,25 +139,39 @@ console.log(chalk.yellow(`Output directory created ...`));
 			// Iterate over beard images and get the best match -- then determine the beard enhancement for this current input image
 			const beardMatch = {}; // distance, id, enhancement -- to populate this object.
 			for (let i = 0; i < beardsImages.length; i += 1) {
-				const beardImgPath = beardsImages[i];
-				const cmpHash = await imghash.hash(beardImgPath);
+				const imgPath = beardsImages[i];
+				const dim = await sizeOf(imgPath);
+				const img = await sharp(imgPath)
+					.extract({
+						top: dim.height / 2,
+						left: dim.width * 0.2,
+						width: dim.width - dim.width * 0.4,
+						height: dim.height / 2
+					})
+					.toBuffer();
+				const cmpHash = await imghash.hash(img);
 				const distance = levenDistance(bottomHash, cmpHash);
+				const id = getName(imgPath);
 				if (
 					distance < beardMatch.distance ||
 					typeof beardMatch.distance === "undefined"
 				) {
 					beardMatch.distance = distance;
-					beardMatch.id = getName(beardImgPath);
+					beardMatch.id = id;
 				}
+				console.log(
+					chalk.grey(`[${image}] Compare with ${path.basename(imgPath)} ...`)
+				);
 			}
-			const enhancements = beardsEnhancements.find(
+
+			const enhancementsRecord = beardsEnhancements.find(
 				(enh) => enh.id === beardMatch.id
 			);
 
-			if (enhancements) {
+			if (enhancementsRecord) {
 				console.log(
-					chalk.grey(`[${image}] Enhancements detected ...`),
-					enhancements
+					chalk.grey(`[${image}] Enhancements detected ${beardMatch.id} ...`),
+					enhancementsRecord.enhancements
 				);
 			} else {
 				console.log(chalk.red(`[${image}] Enhancements not found ...`));
@@ -137,7 +180,7 @@ console.log(chalk.yellow(`Output directory created ...`));
 			// Copy the image to the new directory with the new id as the name.
 			const destination = path.join(
 				outputDir,
-				`${match.id}.${path.extname(image)}`
+				`${match.id}${path.extname(image)}`
 			);
 			await copy(image, destination);
 
@@ -145,7 +188,7 @@ console.log(chalk.yellow(`Output directory created ...`));
 
 			newIndex.push({
 				id: match.id,
-				enhancements,
+				enhancements: enhancementsRecord.enhancements,
 				enhancedImagePath: destination
 			});
 
