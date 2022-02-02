@@ -52,9 +52,9 @@ const options = require("../utils/options")((program) => {
 	program.option("--hex", "Output the files using Hex Format");
 });
 
-const apparelLabels = require("./apparel.json"); // > 0.9
-const headwearLabels = require("./headwear.json"); // Hat Object > 0.6 -- label > 0.7
-const cosmeticsLabels = require("./cosmetics.json"); // > 0.91 & Age > 15
+const apparelLabels = require("./apparel.json"); // > 0.6 -- all
+const headwearLabels = require("./headwear.json"); // Hat Object > 0.6 -- label > 0.7 -- most confident
+const cosmeticsLabels = require("./cosmetics.json"); // > 0.6 & Age > 15 -- all
 
 const {
 	input,
