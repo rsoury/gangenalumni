@@ -23,23 +23,32 @@ const outputDir = options.output || process.cwd();
 mkdirp.sync(outputDir);
 
 (async () => {
-	const outputFile = path.join(outputDir, "all-labels.json");
+	const labelsOutputFile = path.join(outputDir, "all-labels.json");
+	const objectsOutputFile = path.join(outputDir, "all-objects.json");
 	const labelDataFiles = await glob(path.join(input, "*.json"));
 	const allLabels = [];
+	const allObjects = [];
 
 	for (let i = 0; i < labelDataFiles.length; i += 1) {
-		const { labels } = await jsonfile.readFile(labelDataFiles[i]);
+		const { labels, objects } = await jsonfile.readFile(labelDataFiles[i]);
 		labels.forEach(({ description }) => {
 			allLabels.push(description);
+		});
+		objects.forEach(({ name }) => {
+			allObjects.push(name);
 		});
 	}
 
 	const aggLabels = _.uniq(allLabels);
-	await jsonfile.writeFile(outputFile, aggLabels);
+	const aggObjects = _.uniq(allObjects);
+	await jsonfile.writeFile(labelsOutputFile, aggLabels);
+	await jsonfile.writeFile(objectsOutputFile, aggObjects);
 
+	console.log(chalk.green(`All done!`));
 	console.log(
-		chalk.green(
-			`All done! ${allLabels.length} labels aggregated down to ${aggLabels.length} and stored at ${outputFile}`
-		)
+		`${allLabels.length} labels aggregated down to ${aggLabels.length} and stored at ${labelsOutputFile}`
+	);
+	console.log(
+		`${allObjects.length} objects aggregated down to ${aggObjects.length} and stored at ${objectsOutputFile}`
 	);
 })();

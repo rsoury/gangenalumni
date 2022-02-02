@@ -19,8 +19,9 @@ const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
 const _ = require("lodash");
-const Queue = require("./utils/queue");
-const options = require("./utils/options")((program) => {
+const { getName, inspectObject } = require("../utils");
+const Queue = require("../utils/queue");
+const options = require("../utils/options")((program) => {
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."
@@ -28,6 +29,10 @@ const options = require("./utils/options")((program) => {
 	program.option("-f, --face-data <value>", "Path to face dataset.");
 	program.option("-e, --ethnicity-data <value>", "Path to ethnicity dataset.");
 	program.option("-n, --name-data <value>", "Path to produced names dataset.");
+	program.option(
+		"-l, --label-data <value>",
+		"Path to produced labels dataset."
+	);
 	program.option(
 		"-af, --accessories-file <value>",
 		"Path to accessories output JSON file"
@@ -46,13 +51,17 @@ const options = require("./utils/options")((program) => {
 	);
 	program.option("--hex", "Output the files using Hex Format");
 });
-const { inspectObject } = require("./utils");
+
+const apparelLabels = require("./apparel.json"); // > 0.9
+const headwearLabels = require("./headwear.json"); // Hat Object > 0.6 -- label > 0.7
+const cosmeticsLabels = require("./cosmetics.json"); // > 0.91 & Age > 15
 
 const {
 	input,
 	faceData: faceDataInput,
 	ethnicityData: ethnicityDataInput,
 	nameData: nameDataInput,
+	labelData: labelDataInput,
 	accessoriesFile,
 	enhancementsFile,
 	output: outputDir,
@@ -88,8 +97,6 @@ const contractMetadata = {
 	image:
 		"https://gangenalumni.com/wp-content/uploads/2021/12/cropped-GangenAlumni-Icon.png", // TODO: Move to IPFS
 	external_link: "https://gangenalumni.com"
-	// seller_fee_basis_points: 250, // Indicates a 2.5% seller fee.
-	// fee_recipient: "0x8D674B63BB0F59fEebc08565AbcB7fdfe3801817" // Where seller fees will be paid to.
 };
 
 // Unique Id for Folder to store files in...
@@ -132,30 +139,37 @@ mkdirp.sync(outputDir);
 	const nameDataSources = await glob(`${nameDataInput}/*.json`, {
 		absolute: true
 	});
+	const labelDataSources = await glob(`${labelDataInput}/*.json`, {
+		absolute: true
+	});
 	const accessoriesDataSource = path.resolve(accessoriesFile);
 	const enhancementsDataSource = path.resolve(enhancementsFile);
 	const accessoriesData = await jsonfile.readFile(accessoriesDataSource);
 	const enhancementsData = await jsonfile.readFile(enhancementsDataSource);
 
-	const getNameFromPath = (filepath) =>
-		path.basename(filepath).split(".").slice(0, -1).join(".");
-	const sources = faceDataSources.map((filepath) => {
-		const fdName = getNameFromPath(filepath);
-		const findFn = (fp) => {
-			const edName = getNameFromPath(fp);
-			return fdName === edName;
-		};
-		const ethnFilepath = ethnDataSources.find(findFn);
-		const namesFilepath = nameDataSources.find(findFn);
+	const sources = (images.length > 0 ? images : faceDataSources).map(
+		(filepath) => {
+			const fdName = getName(filepath);
+			const findFn = (fp) => {
+				const edName = getName(fp);
+				return fdName === edName;
+			};
+			const faceFilepath =
+				images.length > 0 ? faceDataSources.find(findFn) : filepath;
+			const ethnFilepath = ethnDataSources.find(findFn);
+			const nameFilepath = nameDataSources.find(findFn);
+			const labelFilepath = labelDataSources.find(findFn);
 
-		return {
-			id: fdName,
-			face: filepath,
-			ethnicity: ethnFilepath,
-			name: namesFilepath,
-			image: images.find(findFn)
-		};
-	});
+			return {
+				id: fdName,
+				face: faceFilepath,
+				ethnicity: ethnFilepath,
+				name: nameFilepath,
+				label: labelFilepath,
+				image: filepath
+			};
+		}
+	);
 
 	const q = new Queue(
 		async ({ files }) => {
@@ -184,6 +198,7 @@ mkdirp.sync(outputDir);
 			const ethnicityData = files.ethnicity
 				? await jsonfile.readFile(files.ethnicity)
 				: {};
+			const labelData = files.label ? await jsonfile.readFile(files.label) : {};
 			const nameData = files.name ? await jsonfile.readFile(files.name) : {};
 
 			const { name } = nameData;
@@ -222,24 +237,34 @@ mkdirp.sync(outputDir);
 			} else if (faceDetails.Eyeglasses.Value) {
 				eyewear = "Eyeglasses";
 			}
-			// Mouth
-			let mouth;
-			if (faceDetails.MouthOpen.Value && faceDetails.Smile.Value) {
-				mouth = "Open Smile";
-			} else if (faceDetails.Smile.Value) {
-				mouth = "Smiling";
-			} else if (faceDetails.MouthOpen.Value) {
-				mouth = "Open";
-			} else {
-				mouth = "Closed";
+			// Features
+			// -- Mouth
+			if (faceDetails.Smile.Value) {
+				attributes.push({
+					trait_type: "Features",
+					value: "Smiling"
+				});
 			}
-			// // Facing
-			// let facing = "Forward";
-			// if (faceDetails.Pose.Yaw < 10) {
-			// 	facing = "Left";
-			// } else if (faceDetails.Pose.Yaw > 10) {
-			// 	facing = "Right";
-			// }
+			attributes.push({
+				trait_type: "Features",
+				value: `Mouth ${faceDetails.MouthOpen.Value ? "Open" : "Closed"}`
+			});
+			attributes.push({
+				trait_type: "Features",
+				value: `Eyes ${faceDetails.EyesOpen.Value ? "Open" : "Closed"}`
+			});
+			// -- Facing
+			let facing = "Forward";
+			if (faceDetails.Pose.Yaw < 10) {
+				facing = "Left";
+			} else if (faceDetails.Pose.Yaw > 10) {
+				facing = "Right";
+			}
+			attributes.push({
+				trait_type: "Features",
+				value: `Facing ${facing}`
+			});
+
 			attributes.push({
 				trait_type: "Cast Member #",
 				value: id
@@ -260,20 +285,6 @@ mkdirp.sync(outputDir);
 				trait_type: "Eyewear",
 				value: eyewear
 			});
-			attributes.push({
-				trait_type: "Eyes",
-				value: faceDetails.EyesOpen.Value ? "Open" : "Closed"
-			});
-			if (mouth) {
-				attributes.push({
-					trait_type: "Mouth",
-					value: mouth
-				});
-			}
-			// attributes.push({
-			// 	trait_type: "Facing",
-			// 	value: facing
-			// });
 
 			ethnicityData.forEach((eth) => {
 				if (eth.value > 0.25) {
