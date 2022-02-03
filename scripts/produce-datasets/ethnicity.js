@@ -79,7 +79,7 @@ mkdirp.sync(outputDir);
 				stub.PostModelOutputs(
 					{
 						// This is the model ID of a publicly available General model. You may use any other public or custom model ID.
-						model_id: "93c277ec3940fba661491fda4d3ccfa0", // appearance-multicultural -- pre-trained model
+						model_id: "ethnicity-demographics-recognition", // appearance-multicultural -- pre-trained model
 						inputs: [
 							{
 								data: {
