@@ -8,6 +8,9 @@
  * https://docs.opensea.io/docs/metadata-standards
  * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
  * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1155.md#erc-1155-metadata-uri-json-schema
+ *
+ * Example Command:
+ * yarn metadata --input ./output/step1/1641949185310/33.jpeg --face-data ./data/face --ethnicity-data ./data/ethnicity --name-data ./data/name --label-data ./data/label --accessories-file ./output/step2.2/1637990312861/info.json --enhancements-file ./output/step2.1/1639277939/index.json --output ./tmp/nft-debug --image-url https://gangenalumni.s3.us-east-2.amazonaws.com/rinkeby/images/\{id\}.jpg --overwrite --hex
  */
 
 require("dotenv").config();
@@ -19,7 +22,7 @@ const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
 const _ = require("lodash");
-const { getName, inspectObject } = require("../utils");
+const { getName, inspectObject, getImages } = require("../utils");
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
 	program.requiredOption(
@@ -51,10 +54,12 @@ const options = require("../utils/options")((program) => {
 	);
 	program.option("--hex", "Output the files using Hex Format");
 });
+const applyLabel = require("./apply-label");
 
 const apparelLabelSettings = require("./apparel.json");
 const headwearLabelSettings = require("./headwear.json");
-const cosmeticsLabelSettings = require("./cosmetics.json");
+const cosmeticLabelSettings = require("./cosmetic.json");
+const backgroundLabelSettings = require("./background.json");
 
 const {
 	input,
@@ -109,7 +114,7 @@ mkdirp.sync(outputDir);
 
 (async () => {
 	const contractDescription = await fs.readFile(
-		path.resolve(__dirname, "../md/contract-description.md"),
+		path.resolve(__dirname, "./md/contract-description.md"),
 		"utf-8"
 	);
 	contractMetadata.description = contractDescription;
@@ -120,15 +125,13 @@ mkdirp.sync(outputDir);
 	);
 
 	const descriptionTemplate = await fs.readFile(
-		path.resolve(__dirname, "../md/description-template.md"),
+		path.resolve(__dirname, "./md/description-template.md"),
 		"utf-8"
 	);
 
 	let images = [];
 	if (input) {
-		images = await glob(`${input}/*.{jpeg,jpg,png}`, {
-			absolute: true
-		});
+		images = await getImages(input);
 	}
 	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
 		absolute: true
@@ -201,7 +204,7 @@ mkdirp.sync(outputDir);
 			const labelData = files.label ? await jsonfile.readFile(files.label) : {};
 			const nameData = files.name ? await jsonfile.readFile(files.name) : {};
 
-			const { name } = nameData;
+			const { name = "" } = nameData;
 
 			let image = "";
 			if (imageUrl) {
@@ -231,7 +234,7 @@ mkdirp.sync(outputDir);
 			// Mood
 			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
 			// Eyewear
-			let eyewear = "Nothing";
+			let eyewear;
 			if (faceDetails.Sunglasses.Value) {
 				eyewear = "Sunglasses";
 			} else if (faceDetails.Eyeglasses.Value) {
@@ -281,10 +284,12 @@ mkdirp.sync(outputDir);
 				trait_type: "Mood",
 				value: mood
 			});
-			attributes.push({
-				trait_type: "Eyewear",
-				value: eyewear
-			});
+			if (eyewear) {
+				attributes.push({
+					trait_type: "Eyewear",
+					value: eyewear
+				});
+			}
 
 			ethnicityData.forEach((eth) => {
 				if (eth.value > 0.25) {
@@ -367,50 +372,14 @@ mkdirp.sync(outputDir);
 			// The rest of the labels which have group management ...
 			const apparelLabels = []; // { label, setting }
 			const cosmeticLabels = []; // { label, setting }
+			const backgroundLabels = []; // { label, setting }
 			labelData.labels.forEach((label) => {
 				// -- Apparel
-				const apparelSetting = apparelLabelSettings.find(
-					(setting) => setting.name === label.description
-				);
-				if (!_.isUndefined(apparelSetting)) {
-					if (label.score > apparelSetting.score) {
-						const existingLabel = apparelLabels.find(
-							({ setting }) =>
-								setting.group === apparelSetting.group &&
-								apparelSetting.group > 0
-						);
-						if (_.isUndefined(existingLabel)) {
-							apparelLabels.push({
-								label,
-								setting: apparelSetting
-							});
-						} else if (label.score > existingLabel.label.score) {
-							// Check to see if the current label has a higher score than the label for this given group.
-							// Get the index of the existing label
-							const existingLabelIndex = apparelLabels.findIndex(
-								({ setting }) =>
-									setting.group === apparelSetting.group &&
-									apparelSetting.group > 0
-							);
-							// Replace the existing label
-							if (existingLabelIndex < 0) {
-								console.log(
-									chalk.red(`ERROR: existing label found but index not found`),
-									apparelLabels,
-									label,
-									existingLabel,
-									existingLabelIndex
-								);
-							} else {
-								apparelLabels[existingLabelIndex] = {
-									label,
-									setting: apparelSetting
-								};
-							}
-						}
-					}
-				}
+				applyLabel(apparelLabels, label, apparelLabelSettings);
 				// -- Cosmetics
+				applyLabel(cosmeticLabels, label, cosmeticLabelSettings);
+				// -- Background
+				applyLabel(backgroundLabels, label, backgroundLabelSettings);
 			});
 
 			apparelLabels.forEach(({ label }) => {
@@ -419,9 +388,16 @@ mkdirp.sync(outputDir);
 					value: label.description
 				});
 			});
+			// TODO: Should add "Eye liner" to id 33 -- Fine tune the Settings.
 			cosmeticLabels.forEach(({ label }) => {
 				attributes.push({
-					trait_type: "Apparel",
+					trait_type: "Cosmetics",
+					value: label.description
+				});
+			});
+			backgroundLabels.forEach(({ label }) => {
+				attributes.push({
+					trait_type: "Background",
 					value: label.description
 				});
 			});
