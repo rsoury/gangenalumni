@@ -1,0 +1,3 @@
+[submodule "bi/redash"]
+  path = bi/redash
+  url = git@github.com:getredash/redash.git
