@@ -1,13 +1,13 @@
 [
-	"Hair coloring",
-	"Lipstick",
-	"Eye liner",
-	"Lace wig",
-	"Wig",
-	"Lip gloss",
-	"Mascara",
-	"Eye shadow",
-	"Eyelash extensions",
-	"Gloss",
-	"Contact lens"
+	{ "name": "Hair coloring", "type": "label", "score": 0.9, "group": 0 },
+	{ "name": "Lipstick", "type": "label", "score": 0.91, "group": 1 },
+	{ "name": "Eye liner", "type": "label", "score": 0.9, "group": 2 },
+	{ "name": "Lace wig", "type": "label", "score": 0.9, "group": 3 },
+	{ "name": "Wig", "type": "label", "score": 0.9, "group": 3 },
+	{ "name": "Lip gloss", "type": "label", "score": 0.9, "group": 1 },
+	{ "name": "Mascara", "type": "label", "score": 0.9, "group": 0 },
+	{ "name": "Eye shadow", "type": "label", "score": 0.9, "group": 2 },
+	{ "name": "Eyelash extensions", "type": "label", "score": 0.9, "group": 0 },
+	{ "name": "Gloss", "type": "label", "score": 0.9, "group": 1 },
+	{ "name": "Contact lens", "type": "label", "score": 0.9, "group": 0 }
 ]

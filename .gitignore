@@ -22,11 +22,7 @@ dist
 build
 bin
 data/**/*
-!data/aws/.gitkeep
-!data/face/.gitkeep
-!data/ethnicity/.gitkeep
-!data/name/.gitkeep
-!data/nft/.gitkeep
+!data/.gitkeep
 deployments/localhost
 deployments/hardhat
 

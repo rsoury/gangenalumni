@@ -52,9 +52,9 @@ const options = require("../utils/options")((program) => {
 	program.option("--hex", "Output the files using Hex Format");
 });
 
-const apparelLabels = require("./apparel.json"); // > 0.6 -- all
-const headwearLabels = require("./headwear.json"); // Hat Object > 0.6 -- label > 0.7 -- most confident
-const cosmeticsLabels = require("./cosmetics.json"); // > 0.6 & Age > 15 -- all
+const apparelLabelSettings = require("./apparel.json");
+const headwearLabelSettings = require("./headwear.json");
+const cosmeticsLabelSettings = require("./cosmetics.json");
 
 const {
 	input,
@@ -328,6 +328,102 @@ mkdirp.sync(outputDir);
 				// 		value
 				// 	});
 				// }
+			});
+
+			// Label Attributes
+			// -- Headwear
+			if (
+				!_.isUndefined(
+					labelData.objects.find((o) => o.name === "Hat" && o.score > 0.5)
+				)
+			) {
+				// Has hat
+				let hatLabel = {};
+				labelData.labels.forEach((label) => {
+					const labelSetting = headwearLabelSettings.find(
+						(setting) => setting.name === label.description
+					);
+					if (!_.isUndefined(labelSetting)) {
+						if (label.score > labelSetting.score) {
+							if (label.score > hatLabel.score || _.isEmpty(hatLabel)) {
+								hatLabel = label;
+							}
+						}
+					}
+				});
+				if (_.isEmpty(hatLabel)) {
+					const foundHatLabel = labelData.labels.find(
+						(label) => label.description === "Hat" && label.score > 0.8
+					);
+					if (!_.isUndefined(foundHatLabel)) {
+						hatLabel = foundHatLabel;
+					}
+				}
+				attributes.push({
+					trait_type: "Headwear",
+					value: hatLabel.description
+				});
+			}
+			// The rest of the labels which have group management ...
+			const apparelLabels = []; // { label, setting }
+			const cosmeticLabels = []; // { label, setting }
+			labelData.labels.forEach((label) => {
+				// -- Apparel
+				const apparelSetting = apparelLabelSettings.find(
+					(setting) => setting.name === label.description
+				);
+				if (!_.isUndefined(apparelSetting)) {
+					if (label.score > apparelSetting.score) {
+						const existingLabel = apparelLabels.find(
+							({ setting }) =>
+								setting.group === apparelSetting.group &&
+								apparelSetting.group > 0
+						);
+						if (_.isUndefined(existingLabel)) {
+							apparelLabels.push({
+								label,
+								setting: apparelSetting
+							});
+						} else if (label.score > existingLabel.label.score) {
+							// Check to see if the current label has a higher score than the label for this given group.
+							// Get the index of the existing label
+							const existingLabelIndex = apparelLabels.findIndex(
+								({ setting }) =>
+									setting.group === apparelSetting.group &&
+									apparelSetting.group > 0
+							);
+							// Replace the existing label
+							if (existingLabelIndex < 0) {
+								console.log(
+									chalk.red(`ERROR: existing label found but index not found`),
+									apparelLabels,
+									label,
+									existingLabel,
+									existingLabelIndex
+								);
+							} else {
+								apparelLabels[existingLabelIndex] = {
+									label,
+									setting: apparelSetting
+								};
+							}
+						}
+					}
+				}
+				// -- Cosmetics
+			});
+
+			apparelLabels.forEach(({ label }) => {
+				attributes.push({
+					trait_type: "Apparel",
+					value: label.description
+				});
+			});
+			cosmeticLabels.forEach(({ label }) => {
+				attributes.push({
+					trait_type: "Apparel",
+					value: label.description
+				});
 			});
 
 			const attrText = attributes
