@@ -32,4 +32,4 @@ deployments/hardhat
 
 # BI
 bi/data
-bi/redash/data
+bi/redash
