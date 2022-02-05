@@ -60,6 +60,7 @@ const apparelLabelSettings = require("./apparel.json");
 const headwearLabelSettings = require("./headwear.json");
 const cosmeticLabelSettings = require("./cosmetic.json");
 const backgroundLabelSettings = require("./background.json");
+const { reduce } = require("lodash");
 
 const {
 	input,
@@ -231,6 +232,20 @@ mkdirp.sync(outputDir);
 				Math.floor(
 					Math.random() * (faceDetails.AgeRange.High - faceDetails.AgeRange.Low)
 				) + faceDetails.AgeRange.Low;
+
+			attributes.push({
+				trait_type: "Cast Member #",
+				value: id
+			});
+			attributes.push({
+				trait_type: "Age",
+				value: age
+			});
+			attributes.push({
+				trait_type: "Gender",
+				value: gender
+			});
+
 			// Mood
 			const mood = _.startCase(faceDetails.Emotions[0].Type.toLowerCase());
 			// Eyewear
@@ -266,19 +281,6 @@ mkdirp.sync(outputDir);
 			attributes.push({
 				trait_type: "Features",
 				value: `Facing ${facing}`
-			});
-
-			attributes.push({
-				trait_type: "Cast Member #",
-				value: id
-			});
-			attributes.push({
-				trait_type: "Gender",
-				value: gender
-			});
-			attributes.push({
-				trait_type: "Age",
-				value: age
 			});
 			attributes.push({
 				trait_type: "Mood",
@@ -390,7 +392,6 @@ mkdirp.sync(outputDir);
 					value: label.description
 				});
 			});
-			// TODO: Should add "Eye liner" to id 33 -- Fine tune the Settings.
 			cosmeticLabels.forEach(({ label }) => {
 				attributes.push({
 					trait_type: "Cosmetics",
@@ -404,9 +405,22 @@ mkdirp.sync(outputDir);
 				});
 			});
 
-			const attrText = attributes
+			const attrText = _.cloneDeep(attributes)
+				.filter((attr) => !["Cast Member #"].includes(attr.trait_type))
+				.reduce((newList, attr) => {
+					const existingTraitIndex = newList.findIndex(
+						({ trait_type }) => trait_type === attr.trait_type
+					);
+					if (existingTraitIndex >= 0) {
+						newList[existingTraitIndex].value.push(attr.value);
+					} else {
+						attr.value = [attr.value];
+						newList.push(attr);
+					}
+					return newList;
+				}, [])
 				.map((attr) => {
-					return `- ${attr.trait_type}: ${attr.value}`;
+					return `- ${attr.trait_type}: ${attr.value.join(", ")}`;
 				})
 				.join("\n");
 
