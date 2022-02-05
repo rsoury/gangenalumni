@@ -1,13 +1,9 @@
 [
-	{ "name": "Hair coloring", "score": 0.9, "group": 0 },
-	{ "name": "Lipstick", "score": 0.91, "group": 1 },
-	{ "name": "Eye liner", "score": 0.8, "group": 2 },
-	{ "name": "Lace wig", "score": 0.9, "group": 3 },
-	{ "name": "Wig", "score": 0.9, "group": 3 },
-	{ "name": "Lip gloss", "score": 0.9, "group": 1 },
-	{ "name": "Mascara", "score": 0.65, "group": 0 },
-	{ "name": "Eye shadow", "score": 0.9, "group": 2 },
-	{ "name": "Eyelash extensions", "score": 0.9, "group": 0 },
-	{ "name": "Gloss", "score": 0.9, "group": 1 },
-	{ "name": "Contact lens", "score": 0.9, "group": 0 }
+	{ "name": "Hair coloring", "score": 0.62, "group": 0 },
+	{ "name": "Lipstick", "score": 0.915, "group": 1 },
+	{ "name": "Eye liner", "score": 0.75, "group": 2 },
+	{ "name": "Lip gloss", "score": 0.7, "group": 1 },
+	{ "name": "Mascara", "score": 0.64, "group": 0 },
+	{ "name": "Eye shadow", "score": 0.75, "group": 2 },
+	{ "name": "Eyelash extensions", "score": 0.7, "group": 0 }
 ]

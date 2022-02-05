@@ -339,7 +339,7 @@ mkdirp.sync(outputDir);
 			// -- Headwear
 			if (
 				!_.isUndefined(
-					labelData.objects.find((o) => o.name === "Hat" && o.score > 0.5)
+					labelData.objects.find((o) => o.name === "Hat" && o.score > 0.6)
 				)
 			) {
 				// Has hat
@@ -364,10 +364,12 @@ mkdirp.sync(outputDir);
 						hatLabel = foundHatLabel;
 					}
 				}
-				attributes.push({
-					trait_type: "Headwear",
-					value: hatLabel.description
-				});
+				if (!_.isEmpty(hatLabel)) {
+					attributes.push({
+						trait_type: "Headwear",
+						value: hatLabel.description
+					});
+				}
 			}
 			// The rest of the labels which have group management ...
 			const apparelLabels = []; // { label, setting }
