@@ -1,7 +1,6 @@
 /**
  * Data Step 2 -- After production of Face Dectection Datasets -- produce-datasets/face.js
- * Produce Label/Object Dataset -- which lists different objects within an image with confidence metric.
- * This will have to also produce a list of labels aggregated from each result for us to use inside of metadata-factory.js
+ * Produce Relationships Dataset -- which produces an array of Family Units comprised of Character Ids
  */
 
 require("dotenv").config();
@@ -20,8 +19,11 @@ const options = require("../utils/options")((program) => {
 		"-o, --output <value>",
 		"Path to the output dataset directory."
 	);
-	program.option("-f, --face-data <value>", "Path to face dataset.");
-	program.option("-e, --ethnicity-data <value>", "Path to ethnicity dataset.");
+	program.requiredOption("-f, --face-data <value>", "Path to face dataset.");
+	program.requiredOption(
+		"-e, --ethnicity-data <value>",
+		"Path to ethnicity dataset."
+	);
 	program.option(
 		"--overwrite",
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
@@ -112,28 +114,38 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 		absolute: true
 	});
 
-	const ages = _.range(0, faceDataSources.length, 0);
+	const ages = {};
 	for (let i = 0; i < faceDataSources.length; i += 1) {
 		const faceFile = faceDataSources[i];
 		const faceData = faceFile ? await jsonfile.readFile(faceFile) : {};
 		const faceDetails = faceData.FaceDetails[0];
 		// Determine Age
-		const age =
+		let age =
 			Math.floor(
 				Math.random() * (faceDetails.AgeRange.High - faceDetails.AgeRange.Low)
-			) + faceDetails.AgeRange.Low;
-		const id = parseInt(getName(faceFile), 10);
-		ages[id] = age;
+			) +
+			(faceDetails.AgeRange.Low === 0 && faceDetails.AgeRange.High <= 3
+				? faceDetails.AgeRange.Low
+				: 1);
+		const name = getName(faceFile);
+		if (!age) {
+			age = "< 1";
+		}
+		ages[name] = age;
 	}
 
-	if (ages.includes(0)) {
+	if (Object.keys(ages).length !== faceDataSources.length) {
 		throw new Error("Face element has been skipped");
 	} else {
-		if (ages.length !== 10000) {
-			console.log(`WARN: Ages acquired for ${ages.length} faces`);
+		const noAged = Object.entries(ages)
+			.filter(([, v]) => v === 0 || v === "0")
+			.map(([k]) => k);
+		if (noAged.length > 0) {
+			console.log(chalk.red("No age for tokens"), noAged.length, noAged);
+			throw new Error("Tokens without age");
 		}
-		console.log(chalk.green(`Ages processed`));
 	}
+	console.log(chalk.green(`Ages processed`));
 
 	const q = new Queue(
 		async ({ image }) => {
