@@ -60,7 +60,6 @@ const apparelLabelSettings = require("./apparel.json");
 const headwearLabelSettings = require("./headwear.json");
 const cosmeticLabelSettings = require("./cosmetic.json");
 const backgroundLabelSettings = require("./background.json");
-const { reduce } = require("lodash");
 
 const {
 	input,
@@ -102,7 +101,7 @@ const contractMetadata = {
 	description: ``,
 	image:
 		"https://gangenalumni.com/wp-content/uploads/2021/12/cropped-GangenAlumni-Icon.png", // TODO: Move to IPFS
-	external_link: "https://gangenalumni.com"
+	external_link: "https://gangenalumni.com?ref=md_external"
 };
 
 // Unique Id for Folder to store files in...

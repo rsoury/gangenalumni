@@ -1,8 +1,7 @@
 /**
  * Data Step 2 -- After production of Face Dectection Datasets -- produce-datasets/face.js
- *
- * Collect AI based Ethnicity Prediction data on each of the images in Step 1.
- * Uses the Clarifai Demographics AI Model
+ * Produce Label/Object Dataset -- which lists different objects within an image with confidence metric.
+ * This will have to also produce a list of labels aggregated from each result for us to use inside of metadata-factory.js
  */
 
 require("dotenv").config();
@@ -10,46 +9,136 @@ const path = require("path");
 const fs = require("fs").promises;
 const chalk = require("chalk");
 const mkdirp = require("mkdirp");
-const glob = require("glob-promise");
 const debugLog = require("debug")("datasets");
 const jsonfile = require("jsonfile");
+const _ = require("lodash");
+const glob = require("glob-promise");
+const { Rekognition } = require("aws-sdk");
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
 	program.requiredOption(
 		"-o, --output <value>",
 		"Path to the output dataset directory."
 	);
+	program.option("-f, --face-data <value>", "Path to face dataset.");
+	program.option("-e, --ethnicity-data <value>", "Path to ethnicity dataset.");
 	program.option(
 		"--overwrite",
 		"Determine whether to overwrite the existing dataset files, or leave off the command to simply fill the missing files."
 	);
 });
-// const { inspectObject } = require("../utils");
+const { getImages, getName } = require("../utils");
 
-const { input, output: outputDir, overwrite } = options;
+const {
+	input,
+	faceData: faceDataInput,
+	ethnicityData: ethnicityDataInput,
+	output: outputDir,
+	overwrite
+} = options;
 
 debugLog(`Output Directory: ${outputDir}`);
 
-let sourceImages = [];
+const comparisonsDir = path.join(outputDir, "comparisons");
 
 // Create dir
 mkdirp.sync(outputDir);
+mkdirp.sync(comparisonsDir);
+
+const rekognition = new Rekognition();
+
+const compareFaces = async (sourceImgPath, targetImgPath) => {
+	const sourceId = getName(sourceImgPath);
+	const targetId = getName(targetImgPath);
+	const comparison = (
+		(await Promise.all(
+			[
+				[sourceId, targetId],
+				[targetId, sourceId]
+			].map(async (pair) => {
+				const comparisonPath = path.join(
+					comparisonsDir,
+					`${pair[0]}-${pair[1]}.json`
+				);
+				const stat = await fs.lstat(comparisonPath);
+				if (!stat.isFile()) {
+					return false;
+				}
+				const result = await jsonfile.readFile(comparisonPath);
+				return result;
+			})
+		)) || []
+	).find((result) => !_.isEmpty(result));
+
+	if (!_.isEmpty(comparison)) {
+		return comparison;
+	}
+
+	const source = await fs.readFile(sourceImgPath);
+	const target = await fs.readFile(targetImgPath);
+	const response = await rekognition
+		.compareFaces({
+			SourceImage: {
+				Bytes: Buffer.from(source).toString("base64")
+			},
+			TargetImage: {
+				Bytes: Buffer.from(target).toString("base64")
+			}
+		})
+		.promise();
+
+	const result = {
+		similarity: response.FaceMatches[0].Similarity,
+		sourceId,
+		targetId,
+		response
+	};
+
+	// Cache the result
+	await jsonfile.writeFile(
+		path.join(comparisonsDir, `${sourceId}-${targetId}.json`),
+		result
+	);
+
+	return result;
+};
 
 (async () => {
-	const stat = await fs.lstat(input);
-	if (stat.isFile()) {
-		// Use file as image
-		sourceImages.push(path.resolve(input));
+	const sourceImages = await getImages(input);
+	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
+		absolute: true
+	});
+	const ethnDataSources = await glob(`${ethnicityDataInput}/*.json`, {
+		absolute: true
+	});
+
+	const ages = _.range(0, faceDataSources.length, 0);
+	for (let i = 0; i < faceDataSources.length; i += 1) {
+		const faceFile = faceDataSources[i];
+		const faceData = faceFile ? await jsonfile.readFile(faceFile) : {};
+		const faceDetails = faceData.FaceDetails[0];
+		// Determine Age
+		const age =
+			Math.floor(
+				Math.random() * (faceDetails.AgeRange.High - faceDetails.AgeRange.Low)
+			) + faceDetails.AgeRange.Low;
+		const id = parseInt(getName(faceFile), 10);
+		ages[id] = age;
+	}
+
+	if (ages.includes(0)) {
+		throw new Error("Face element has been skipped");
 	} else {
-		// Get images from directory
-		sourceImages = await glob(`${input}/*.{jpeg,jpg,png}`, {
-			absolute: true
-		});
+		if (ages.length !== 10000) {
+			console.log(`WARN: Ages acquired for ${ages.length} faces`);
+		}
+		console.log(chalk.green(`Ages processed`));
 	}
 
 	const q = new Queue(
 		async ({ image }) => {
-			const name = path.basename(image).split(".").slice(0, -1).join(".");
+			const name = getName(image);
+			const nameNum = parseInt(name, 10);
 			const outputFile = path.join(outputDir, `${name}.json`);
 			if (!overwrite) {
 				try {
@@ -59,12 +148,19 @@ mkdirp.sync(outputDir);
 					// ...
 				}
 			}
+			const faceFile = faceDataSources.find(
+				(filePath) => getName(filePath) === name
+			);
+			const ethnFile = ethnDataSources.find(
+				(filePath) => getName(filePath) === name
+			);
+			const faceData = faceFile ? await jsonfile.readFile(faceFile) : {};
+			const ethnData = ethnFile ? await jsonfile.readFile(ethnFile) : {};
+			const faceDetails = faceData.FaceDetails[0];
 
-			const fileBuffer = await fs.readFile(image);
-			const fileBase64 = Buffer.from(fileBuffer).toString("base64");
-			// console.log(fileBase64.substring(0, 30));
-
-			await jsonfile.writeFile(outputFile, {});
+			const result = {
+				age: ages[nameNum]
+			};
 
 			return { image, output: outputFile };
 		},
@@ -75,7 +171,9 @@ mkdirp.sync(outputDir);
 	);
 
 	// Queue the images for filtering.
-	console.log(chalk.yellow(`Processing relationships from input images...`));
+	console.log(
+		chalk.yellow(`Processing relationships analysis of input images...`)
+	);
 	sourceImages.forEach((image, i) => {
 		q.push({ image, i });
 	});
@@ -85,7 +183,7 @@ mkdirp.sync(outputDir);
 		console.error("Received failed status: ", err.message);
 	});
 
-	q.on("task_finish", (taskId, result) => {
+	q.on("task_finish", async (taskId, result) => {
 		console.log(
 			chalk.green(`[${taskId}] Successfully processed image`),
 			result
