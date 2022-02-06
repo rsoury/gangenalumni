@@ -136,21 +136,17 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 
 	if (Object.keys(ages).length !== faceDataSources.length) {
 		throw new Error("Face element has been skipped");
-	} else {
-		const noAged = Object.entries(ages)
-			.filter(([, v]) => v === 0 || v === "0")
-			.map(([k]) => k);
-		if (noAged.length > 0) {
-			console.log(chalk.red("No age for tokens"), noAged.length, noAged);
-			throw new Error("Tokens without age");
-		}
 	}
+	console.log(
+		chalk.yellow(
+			`${Object.entries(ages).filter(([, v]) => v === "< 1").length} ages < 1`
+		)
+	);
 	console.log(chalk.green(`Ages processed`));
 
 	const q = new Queue(
 		async ({ image }) => {
 			const name = getName(image);
-			const nameNum = parseInt(name, 10);
 			const outputFile = path.join(outputDir, `${name}.json`);
 			if (!overwrite) {
 				try {
@@ -171,7 +167,7 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 			const faceDetails = faceData.FaceDetails[0];
 
 			const result = {
-				age: ages[nameNum]
+				age: ages[name]
 			};
 
 			return { image, output: outputFile };
