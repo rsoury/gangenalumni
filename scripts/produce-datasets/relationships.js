@@ -13,6 +13,7 @@ const jsonfile = require("jsonfile");
 const _ = require("lodash");
 const glob = require("glob-promise");
 const { Rekognition } = require("aws-sdk");
+const chance = require('chance');
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
 	program.requiredOption(
@@ -105,6 +106,55 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 	return result;
 };
 
+const sameEthnicity = (ethn1, ethn2) => {
+  if(ethn1.length !== ethn2.length){
+    return false;
+  }
+  const checks = [];
+  ethn1.forEach(({ name }) => {
+    const match = ethn2.find(ethn => name === ethn.name);
+    if(!_.isUndefined(match)){
+      checks.push(true);
+    }
+  });
+  if(checks.length === ethn1.length){
+    return true;
+  }
+
+  return false;
+}
+
+const similarEthnicity = (ethn1, ethn2) => {
+  if(ethn1.length !== ethn2.length){
+    return false;
+  }
+  const prominentTargetEthn = eth2.reduce((r, c) => {
+    if(_.isEmpty(r)){
+      r.push(c);
+      return r;
+    }
+    // TODO: Deterine similar ethnicity -- Consider if there are two ethncities with the same value.
+    if(c.value === r[0].value){
+      r.push(c);
+      return r;
+    }
+    return r;
+  }, []);
+
+  const checks = []
+  prominentTargetEthn.forEach(({ name }) => {
+    const match = ethn1.find(ethn => name === ethn.name);
+    if(!_.isUndefined(match)){
+      checks.push(true);
+    }
+  });
+  if(checks.length === prominentTargetEthn.length){
+    return true;
+  }
+
+  return false;
+}
+
 (async () => {
 	const sourceImages = await getImages(input);
 	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
@@ -114,7 +164,7 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 		absolute: true
 	});
 
-	const ages = {};
+	const characters = {};
 	for (let i = 0; i < faceDataSources.length; i += 1) {
 		const faceFile = faceDataSources[i];
 		const faceData = faceFile ? await jsonfile.readFile(faceFile) : {};
@@ -128,18 +178,17 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 				? faceDetails.AgeRange.Low
 				: 1);
 		const name = getName(faceFile);
-		if (!age) {
-			age = "< 1";
-		}
-		ages[name] = age;
+		characters[name].age = age;
 	}
 
-	if (Object.keys(ages).length !== faceDataSources.length) {
+	if (Object.keys(characters).length !== faceDataSources.length) {
 		throw new Error("Face element has been skipped");
 	}
 	console.log(
 		chalk.yellow(
-			`${Object.entries(ages).filter(([, v]) => v === "< 1").length} ages < 1`
+			`${
+				Object.entries(characters).filter(([, v]) => v.age === "< 1").length
+			} ages < 1`
 		)
 	);
 	console.log(chalk.green(`Ages processed`));
@@ -164,10 +213,66 @@ const compareFaces = async (sourceImgPath, targetImgPath) => {
 			);
 			const faceData = faceFile ? await jsonfile.readFile(faceFile) : {};
 			const ethnData = ethnFile ? await jsonfile.readFile(ethnFile) : {};
+      const ethnicity = ethnData.filter(eth => eth.value > 0.25)
+      const gender = faceDetails.Gender.Value
+
 			const faceDetails = faceData.FaceDetails[0];
 
+			const spouseCohort = [];
+			const parentCohort = [];
+
+      for(let i = 0; i < faceDataSources.length; i ++){
+        const cmpFaceFile = faceDataSources[i];
+        const cmpName = getName(cmpFaceFile);
+        if(name === cmpName){
+          continue;
+        }
+        const {age} = characters[name].age ? ;
+        const {age: cmpAge} = characters[cmpName];
+        const cmpFaceData = faceFile ? await jsonfile.readFile(faceFile) : {};
+        const cmpFaceDetails = faceData.FaceDetails[0];
+        const cmpEthnFile = ethnDataSources.find(
+          (filePath) => getName(filePath) === name
+        );
+        const cmpEthnData = cmpEthnFile ? await jsonfile.readFile(cmpEthnFile) : {};
+        const cmpEthnicity = cmpEthnData.filter(eth => eth.value > 0.25)
+
+        // For Spouse
+        if(age >= 20){
+          // Check Genders
+          const cGender = gender.toLowerCase()
+          let isOppositeGender = false;
+          if(cGender === 'male') {
+            isOppositeGender = cmpFaceData.Gender.Value.toLowerCase() === "female";
+          }else if (cGender === 'female'){
+            isOppositeGender = cmpFaceData.Gender.Value.toLowerCase() === "male";
+          }
+          if(isOppositeGender || Math.random() <= 0.1){ // 10% chance at intersexual spousal -- however, both candidates need to fall into each other's cohort...
+            const ageDifference = Math.abs(age - cmpAge);
+            const r = chance.weighted(_.range(0, 21), _.range(20, -1, -1)
+            if(r <= ageDifference){ // The greater the difference, the more unlikely the candidate.
+              const r2 = Math.random(); // Let's give a 20% chance if the couple is interracial
+              if(sameEthnicity(ethnicity, cmpEthnicity) || r2 <= 0.2){
+                spouseCohort.push(cmpName)
+                continue; // Cannot be a parent, if it's their spouse
+              }
+            }
+          }
+        }
+
+        // For Parent
+        const ageDifference = cmpAge - age; // No absolute here because a parent must always have > age
+        if(ageDifference >= 18){
+          if(similarEthnicity(ethnicity, cmpEthnicity)){
+
+          }
+        }
+
+        // TODO: We'll to store the result of a comparison -- as the initial loop re-compares the two, there should simply be a skip.
+      }
+
 			const result = {
-				age: ages[name]
+				age: ages[name] // TODO: Metadata needs the following check to be applied -- !ages[name] ? "< 1" : ages[name]
 			};
 
 			return { image, output: outputFile };
