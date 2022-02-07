@@ -16,8 +16,20 @@ contract NFTPublicMinter is Ownable {
 	uint256 public constant PRICE = 0.1 ether;
 	uint256 public constant MAX_TOKEN_COUNT = 10000;
 
-	constructor(address nftAddress) {
+	constructor(address nftAddress, uint256[] memory whitelistedTokenIds) {
 		_nftAddress = nftAddress;
+		for (uint256 i = 1; i <= MAX_TOKEN_COUNT; i++) {
+			bool isWhitelisted = false;
+			for (uint256 j = 0; j < whitelistedTokenIds.length; j++) {
+				if (whitelistedTokenIds[j] == i) {
+					isWhitelisted = true;
+					break;
+				}
+			}
+			if (!isWhitelisted) {
+				_blacklistedTokenIds[i] = true;
+			}
+		}
 	}
 
 	function setDefaultPublicMintCustomURI(string memory newuri)
@@ -38,6 +50,14 @@ contract NFTPublicMinter is Ownable {
 		}
 		for (uint256 i = 0; i < tokenIds.length; i++) {
 			_blacklistedTokenIds[tokenIds[i]] = true;
+		}
+	}
+
+	function whitelistTokenIds(uint256[] memory tokenIds) public onlyOwner {
+		for (uint256 i = 0; i < tokenIds.length; i++) {
+			if (_blacklistedTokenIds[tokenIds[i]]) {
+				_blacklistedTokenIds[tokenIds[i]] = false;
+			}
 		}
 	}
 

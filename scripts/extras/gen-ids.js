@@ -1,5 +1,5 @@
 /**
- * Script to produce an array of ids missing from a directory.
+ * Script to produce an array of ids from a directory.
  */
 
 require("dotenv").config();
@@ -24,26 +24,14 @@ mkdirp.sync(outputDir);
 	const sourceImages = await getImages(input);
 	console.log(chalk.yellow(`Images and data obtained ...`));
 
-	const missingIds = [];
 	const foundIds = sourceImages.map((imgPath) =>
 		parseInt(getName(imgPath), 10)
 	);
-	for (let i = 1; i <= 10000; i += 1) {
-		if (!foundIds.includes(i)) {
-			missingIds.push(i);
-		}
-	}
 
 	await jsonfile.writeFile(
-		path.join(outputDir, `missing-tokens.json`),
-		missingIds
+		path.join(outputDir, `tokens-in-${path.basename(input)}.json`),
+		foundIds
 	);
 
-	console.log(
-		chalk.green(
-			`All done! ${missingIds.length} missing ids, ${
-				foundIds.length
-			} found ids, ${missingIds.length + foundIds.length} in total`
-		)
-	);
+	console.log(chalk.green(`All done! ${foundIds.length} ids found`));
 })();

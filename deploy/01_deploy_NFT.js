@@ -49,7 +49,7 @@ module.exports = async ({ getNamedAccounts, deployments, network, ethers }) => {
 
 	const nftPublicMinterDeployResult = await deploy("NFTPublicMinter", {
 		from: deployer,
-		args: [nftDeployResult.address],
+		args: [nftDeployResult.address, []], // TODO: Giveaway tokens should be passed here.
 		log: true
 	});
 
