@@ -79,7 +79,7 @@ const getAccessories = async () => {
 	return [
 		{
 			name: "cigarette",
-			probability: 0.2,
+			probability: 0.1,
 			sticker: {
 				left: {
 					x: 135,
@@ -106,16 +106,15 @@ const getAccessories = async () => {
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose",
-			skipPigmentCheck: true
+			directionBy: "pose"
 		},
 		{
 			name: "vape",
-			probability: 0.2,
+			probability: 0.1,
 			sticker: {
 				left: {
 					x: 70,
-					y: -10,
+					y: 10,
 					path: path.join(__dirname, "../../assets/stickers/vape-left.png"),
 					dimensions: await sizeOf(
 						path.join(__dirname, "../../assets/stickers/vape-left.png")
@@ -123,7 +122,7 @@ const getAccessories = async () => {
 				},
 				right: {
 					x: 15,
-					y: -10,
+					y: 10,
 					path: path.join(__dirname, "../../assets/stickers/vape-right.png"),
 					dimensions: await sizeOf(
 						path.join(__dirname, "../../assets/stickers/vape-right.png")
@@ -132,8 +131,7 @@ const getAccessories = async () => {
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose",
-			skipPigmentCheck: true
+			directionBy: "pose"
 		},
 		noseScar,
 		{

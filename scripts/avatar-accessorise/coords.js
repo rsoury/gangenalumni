@@ -1,5 +1,10 @@
 const _ = require("lodash");
 const sizeOf = require("image-size");
+const { createCanvas } = require("canvas");
+const colorDifference = require("color-difference");
+const { rgbToHex } = require("../utils");
+
+const MOUTH_COLOUR = "#974B49";
 
 const getCoords = async (image, awsFacialData) => {
 	const dimensions = await sizeOf(image);
@@ -14,26 +19,69 @@ const getCoords = async (image, awsFacialData) => {
 	};
 
 	return {
-		forMouth() {
+		forMouth(canvasContext) {
+			// Here we find the mouth...
+			// Interate over the Y pixels between the mouthTop and mouthBottom and find the pixel closest to the colour red.
 			// Then get the mouth landmark to determine the coordinates
 			const mouthBottomLandmark = getLandmark("mouthDown");
 			const mouthTopLandmark = getLandmark("mouthUp");
-			const mouthBottomCoords = {
-				x: mouthBottomLandmark.X * dimensions.width,
-				y: mouthBottomLandmark.Y * dimensions.height
-			};
 			const mouthTopCoords = {
 				x: mouthTopLandmark.X * dimensions.width,
 				y: mouthTopLandmark.Y * dimensions.height
 			};
-			// Deduce center of mouth coords -- or just below the top of the mouth
-			const mouthCoords = {
-				x:
-					mouthTopCoords.x + ((mouthBottomCoords.x - mouthTopCoords.x) / 8) * 5,
-				y: mouthTopCoords.y + ((mouthBottomCoords.y - mouthTopCoords.y) / 8) * 5
+			const mouthBottomCoords = {
+				x: mouthBottomLandmark.X * dimensions.width,
+				y: mouthBottomLandmark.Y * dimensions.height
 			};
+			if (!canvasContext) {
+				return {
+					x:
+						mouthTopCoords.x +
+						((mouthBottomCoords.x - mouthTopCoords.x) / 8) * 5,
+					y:
+						mouthTopCoords.y +
+						((mouthBottomCoords.y - mouthTopCoords.y) / 8) * 5
+				};
+			}
 
-			return mouthCoords;
+			mouthTopCoords.x = Math.round(mouthTopCoords.x);
+			mouthTopCoords.y = Math.round(mouthTopCoords.y);
+			mouthBottomCoords.x = Math.round(mouthBottomCoords.x);
+			mouthBottomCoords.y = Math.round(mouthBottomCoords.y);
+
+			const mostMouthPixel = { diff: null, coords: { x: 0, y: 0 } };
+
+			const mostLeftCoord =
+				mouthTopCoords.X < mouthBottomCoords.X
+					? mouthTopCoords
+					: mouthBottomCoords;
+			const mostRightCoord =
+				mouthTopCoords.X < mouthBottomCoords.X
+					? mouthBottomCoords
+					: mouthTopCoords;
+
+			for (
+				let y = mouthTopCoords.Y;
+				y <= mouthTopCoords.Y + mouthBottomCoords.Y;
+				y += 1
+			) {
+				for (
+					let x = mostLeftCoord.X;
+					x <= mostLeftCoord.X + mostRightCoord.X;
+					x += 1
+				) {
+					const scanPixel = canvasContext.getImageData(x, y, 1, 1).data;
+					const scanColor = rgbToHex(scanPixel[0], scanPixel[1], scanPixel[2]);
+					const diff = colorDifference.compare(MOUTH_COLOUR, scanColor);
+					if (diff < mostMouthPixel.diff || mostMouthPixel.diff === null) {
+						mostMouthPixel.diff = diff;
+						mostMouthPixel.coords.x = x;
+						mostMouthPixel.coords.y = y;
+					}
+				}
+			}
+
+			return mostMouthPixel.coords;
 		},
 		forNose() {
 			// Then get the mouth landmark to determine the coordinates
@@ -219,10 +267,10 @@ const getCoords = async (image, awsFacialData) => {
 			return coords;
 		},
 		forNeckRight() {
-			const { Y } = getLandmark("chinBottom");
-			const { X } = getLandmark("mouthRight");
+			const { X: chinBottomX, Y } = getLandmark("chinBottom");
+			const { X } = getLandmark("midJawlineRight");
 			const landmark = {
-				X,
+				X: X - (X - chinBottomX) / 4,
 				Y
 			};
 
@@ -234,10 +282,10 @@ const getCoords = async (image, awsFacialData) => {
 			return coords;
 		},
 		forNeckLeft() {
-			const { Y } = getLandmark("chinBottom");
-			const { X } = getLandmark("mouthLeft");
+			const { X: chinBottomX, Y } = getLandmark("chinBottom");
+			const { X } = getLandmark("midJawlineLeft");
 			const landmark = {
-				X,
+				X: X + (chinBottomX - X) / 4,
 				Y
 			};
 

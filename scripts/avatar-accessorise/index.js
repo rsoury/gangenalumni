@@ -16,6 +16,7 @@ const clone = require("deep-clone");
 const sizeOf = require("image-size");
 const { createCanvas, loadImage } = require("canvas");
 const colorDifference = require("color-difference");
+const SegfaultHandler = require("segfault-handler");
 
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
@@ -33,6 +34,10 @@ const getCoords = require("./coords");
 const getAccessories = require("./accessories");
 const { inspectObject, rgbToHex, getImages, getName } = require("../utils");
 const addLandmarkIndicators = require("./indicate");
+
+SegfaultHandler.registerHandler(
+	path.resolve(__dirname, "../../accessories-crash.log")
+);
 
 const { input, faceData: faceDataInput, allOptions, indicate } = options;
 
@@ -87,15 +92,15 @@ mkdirp.sync(outputDir);
 				return accumulator;
 			}, []);
 			let blacklistedLocations = [];
-			if (yaw > 17.5) {
-				// Facing super to the right -- blacklist all "-left" locations
-				blacklistedLocations = allLocations.map(
-					(location) => !location.includes("-left")
+			if (yaw > 15) {
+				// Facing super to the right -- blacklist all "-right" locations
+				blacklistedLocations = allLocations.filter((location) =>
+					location.includes("-right")
 				);
-			} else if (yaw < -17.5) {
-				// Facing super to the left -- blacklist all "-right" locations
-				blacklistedLocations = allLocations.map(
-					(location) => !location.includes("-right")
+			} else if (yaw < -15) {
+				// Facing super to the left -- blacklist all "-left" locations
+				blacklistedLocations = allLocations.filter((location) =>
+					location.includes("-left")
 				);
 			}
 
@@ -108,6 +113,9 @@ mkdirp.sync(outputDir);
 			// const pixels = await getPixels(image);
 			const dimensions = await sizeOf(image);
 			const canvasImage = await loadImage(image);
+			const canvas = createCanvas(dimensions.width, dimensions.height);
+			const ctx = canvas.getContext("2d");
+			ctx.drawImage(canvasImage, 0, 0);
 			const indicativeScanCompositeInput = [];
 
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
@@ -187,7 +195,7 @@ mkdirp.sync(outputDir);
 				let featureCoords = {};
 				switch (selectedLocation) {
 					case "mouth": {
-						featureCoords = coords.forMouth();
+						featureCoords = coords.forMouth(ctx);
 						break;
 					}
 					case "nose": {
@@ -246,6 +254,7 @@ mkdirp.sync(outputDir);
 				if (_.isEmpty(featureCoords)) {
 					return;
 				}
+				debugLog({ featureCoords });
 
 				//* Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
@@ -266,9 +275,6 @@ mkdirp.sync(outputDir);
 							`Cannot find the Pigment Landmark Values for image ${image}`
 						);
 					}
-					const canvas = createCanvas(dimensions.width, dimensions.height);
-					const ctx = canvas.getContext("2d");
-					ctx.drawImage(canvasImage, 0, 0);
 					const pigmentCoords = {
 						x: Math.round(pigmentLandmarkX * dimensions.width),
 						y: Math.round(pigmentLandmarkY * dimensions.height)
@@ -341,7 +347,7 @@ mkdirp.sync(outputDir);
 					);
 					const areaScanRatio = thresholdBreachCount / diff.length;
 					debugLog({ thresholdBreachCount, areaScanRatio });
-					if (areaScanRatio > 0.2) {
+					if (areaScanRatio > 0.1) {
 						return;
 					}
 				}
