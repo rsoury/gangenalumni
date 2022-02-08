@@ -135,10 +135,15 @@ mkdirp.sync(outputDir);
 					];
 
 				// Include some checks -- such as age -- before adding a cigarette/vape.
+				const isUnderage =
+					(faceDetails.AgeRange.Low + faceDetails.AgeRange.High) / 2 < 18;
 				if (
 					selectedLocation === "mouth" &&
-					(faceDetails.AgeRange.Low + faceDetails.AgeRange.High) / 2 < 18
+					(isUnderage || faceDetails.MouthOpen.Value === false)
 				) {
+					return;
+				}
+				if (accessory.name.includes("tattoo") && isUnderage) {
 					return;
 				}
 

@@ -115,7 +115,7 @@ const getAccessories = async () => {
 			sticker: {
 				left: {
 					x: 70,
-					y: 10,
+					y: -10,
 					path: path.join(__dirname, "../../assets/stickers/vape-left.png"),
 					dimensions: await sizeOf(
 						path.join(__dirname, "../../assets/stickers/vape-left.png")
@@ -123,7 +123,7 @@ const getAccessories = async () => {
 				},
 				right: {
 					x: 15,
-					y: 10,
+					y: -10,
 					path: path.join(__dirname, "../../assets/stickers/vape-right.png"),
 					dimensions: await sizeOf(
 						path.join(__dirname, "../../assets/stickers/vape-right.png")
