@@ -4,7 +4,6 @@
  */
 
 const path = require("path");
-const fs = require("fs").promises;
 const chalk = require("chalk");
 const mkdirp = require("mkdirp");
 const glob = require("glob-promise");
@@ -20,6 +19,7 @@ const colorDifference = require("color-difference");
 
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
+	program.requiredOption("-f, --face-data <value>", "Path to face dataset.");
 	program.option(
 		"--all-options",
 		"Flag to remove the probability/chance checks."
@@ -31,10 +31,10 @@ const options = require("../utils/options")((program) => {
 });
 const getCoords = require("./coords");
 const getAccessories = require("./accessories");
-const { inspectObject, rgbToHex } = require("../utils");
+const { inspectObject, rgbToHex, getImages, getName } = require("../utils");
 const addLandmarkIndicators = require("./indicate");
 
-const { input, allOptions, indicate } = options;
+const { input, faceData: faceDataInput, allOptions, indicate } = options;
 
 sharp.cache(false);
 
@@ -44,22 +44,14 @@ const outputDir = path.resolve(__dirname, `../../output/step2.2/${currentTs}`);
 
 debugLog(`Output Directory: ${outputDir}`);
 
-let sourceImages = [];
-
 // Create dir
 mkdirp.sync(outputDir);
 
 (async () => {
-	const stat = await fs.lstat(input);
-	if (stat.isFile()) {
-		// Use file as image
-		sourceImages.push(path.resolve(input));
-	} else {
-		// Get images from directory
-		sourceImages = await glob(`${input}/*.{jpeg,jpg,png}`, {
-			absolute: true
-		});
-	}
+	const sourceImages = await getImages(input);
+	const faceDataSources = await glob(`${faceDataInput}/*.json`, {
+		absolute: true
+	});
 
 	debugLog(sourceImages);
 
@@ -70,17 +62,16 @@ mkdirp.sync(outputDir);
 		async ({ image }) => {
 			// 1. Establish the queue handler
 			const outputFile = path.join(outputDir, path.basename(image));
-			const filename = path.basename(image).replace(/\.[^/.]+$/, ""); // Regex to remove the extension.
-			const awsFrFilepath = path.join(
-				__dirname,
-				`../../data/aws/${filename}.json`
-			);
-			const awsFrData = await jsonfile.readFile(awsFrFilepath);
+			const name = getName(image);
+			const awsFrFilepath = faceDataSources.find((fp) => name === getName(fp));
+			const faceData = await jsonfile.readFile(awsFrFilepath);
+
+			const faceDetails = faceData.FaceDetails[0];
 
 			// 2. Identify which way the avatar is facing
 			//* Use the Roll, Pitch and Yaw metrics to potentially determine which locations to blacklist
 			// https://www.researchgate.net/figure/The-head-pose-rotation-angles-Yaw-is-the-rotation-around-the-Y-axis-Pitch-around-the_fig1_281587953#:~:text=Yaw%20is%20the%20rotation%20around%20the%20Y%2Daxis.,-Pitch%20around%20the
-			const yaw = _.get(awsFrData, "FaceDetails[0].Pose.Yaw");
+			const yaw = faceDetails.Pose.Yaw;
 			if (_.isUndefined(yaw)) {
 				throw new Error(
 					`Cannot find the Yaw for image ${image} - ${awsFrFilepath}`
@@ -108,7 +99,7 @@ mkdirp.sync(outputDir);
 				);
 			}
 
-			const coords = await getCoords(image, awsFrData);
+			const coords = await getCoords(image, faceData);
 
 			// 4. Duplicate/Clone the accessories and randomly re-order to ensure that all accessories have the same opportunity to apply to the avatar
 			const cAccessories = _.shuffle(clone(accessories));
@@ -120,7 +111,6 @@ mkdirp.sync(outputDir);
 			const indicativeScanCompositeInput = [];
 
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
-			// TODO: Include some checks -- such as age -- before adding a cigarette/vape.
 			const composite = [];
 			cAccessories.forEach((accessory) => {
 				// Only add accessory if there is not pre-existing accessory in that facial location and the probability check is met
@@ -143,6 +133,14 @@ mkdirp.sync(outputDir);
 					availableLocations[
 						Math.floor(Math.random() * availableLocations.length)
 					];
+
+				// Include some checks -- such as age -- before adding a cigarette/vape.
+				if (
+					selectedLocation === "mouth" &&
+					(faceData.AgeRange.Low + faceData.AgeRange.High) / 2 < 18
+				) {
+					return;
+				}
 
 				// Some sticker directions are determined by the pose, others by symmetry -- symmetry means that the sticker should look the same regardless of pose, but depending on which side of the face it is being used.
 				const stickerDirection = (
@@ -248,11 +246,7 @@ mkdirp.sync(outputDir);
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
 				// Skin can be observed by taking the pigment from the cheek/nose on the same side that the avatar is facing.
 				if (!accessory.skipPigmentCheck) {
-					const facialLandmarks = _.get(
-						awsFrData,
-						"FaceDetails[0].Landmarks",
-						[]
-					);
+					const facialLandmarks = faceDetails.Landmarks;
 					const { X: pigmentLandmarkX } =
 						facialLandmarks.find(({ Type: type }) =>
 							type === isFacingLeft ? "noseLeft" : "noseRight"
@@ -359,10 +353,10 @@ mkdirp.sync(outputDir);
 					}
 				});
 
-				if (_.isUndefined(accessoriesAdded[filename])) {
-					accessoriesAdded[filename] = {};
+				if (_.isUndefined(accessoriesAdded[name])) {
+					accessoriesAdded[name] = {};
 				}
-				accessoriesAdded[filename][selectedLocation] = accessory.name;
+				accessoriesAdded[name][selectedLocation] = accessory.name;
 			});
 
 			// Sort the composite elements by the accessory elevate value in ascending order -- this way highest elevate value is added last.
@@ -387,7 +381,7 @@ mkdirp.sync(outputDir);
 							indicate
 								? [
 										...indicativeScanCompositeInput,
-										...(await addLandmarkIndicators(image, awsFrData))
+										...(await addLandmarkIndicators(image, faceData))
 								  ]
 								: []
 						)

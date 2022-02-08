@@ -79,7 +79,7 @@ const getAccessories = async () => {
 	return [
 		{
 			name: "cigarette",
-			probability: 0.1,
+			probability: 0.2,
 			sticker: {
 				left: {
 					x: 135,
@@ -111,7 +111,7 @@ const getAccessories = async () => {
 		},
 		{
 			name: "vape",
-			probability: 0.1,
+			probability: 0.2,
 			sticker: {
 				left: {
 					x: 70,
