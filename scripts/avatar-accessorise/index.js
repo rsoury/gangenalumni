@@ -63,8 +63,8 @@ mkdirp.sync(outputDir);
 			// 1. Establish the queue handler
 			const outputFile = path.join(outputDir, path.basename(image));
 			const name = getName(image);
-			const awsFrFilepath = faceDataSources.find((fp) => name === getName(fp));
-			const faceData = await jsonfile.readFile(awsFrFilepath);
+			const faceFilepath = faceDataSources.find((fp) => name === getName(fp));
+			const faceData = await jsonfile.readFile(faceFilepath);
 
 			const faceDetails = faceData.FaceDetails[0];
 
@@ -74,7 +74,7 @@ mkdirp.sync(outputDir);
 			const yaw = faceDetails.Pose.Yaw;
 			if (_.isUndefined(yaw)) {
 				throw new Error(
-					`Cannot find the Yaw for image ${image} - ${awsFrFilepath}`
+					`Cannot find the Yaw for image ${image} - ${faceFilepath}`
 				);
 			}
 			const isFacingLeft = yaw < 0;
@@ -137,7 +137,7 @@ mkdirp.sync(outputDir);
 				// Include some checks -- such as age -- before adding a cigarette/vape.
 				if (
 					selectedLocation === "mouth" &&
-					(faceData.AgeRange.Low + faceData.AgeRange.High) / 2 < 18
+					(faceDetails.AgeRange.Low + faceDetails.AgeRange.High) / 2 < 18
 				) {
 					return;
 				}
