@@ -59,7 +59,7 @@ mkdirp.sync(outputDir);
 		absolute: true
 	});
 
-	debugLog(sourceImages);
+	// debugLog(sourceImages);
 
 	const accessoriesAdded = {};
 	const accessories = await getAccessories(); // calculates dimensions.
@@ -122,6 +122,57 @@ mkdirp.sync(outputDir);
 			const dimensions = await sizeOf(image);
 			const indicativeScanCompositeInput = [];
 
+			const facialLandmarks = faceDetails.Landmarks;
+			// TODO: pigmentLandmark values are incorrect...
+			let landmarkXType = "mouthLeft";
+			let landmarkYType = "noseLeft";
+			if (isFacingLeft) {
+				landmarkXType = "mouthRight";
+				landmarkYType = "noseRight";
+			}
+			const { X: pigmentLandmarkX } =
+				facialLandmarks.find(({ Type: type }) => type === landmarkXType) || {};
+			const { Y: pigmentLandmarkY } =
+				facialLandmarks.find(({ Type: type }) => type === landmarkYType) || {};
+			if (_.isUndefined(pigmentLandmarkX) || _.isUndefined(pigmentLandmarkY)) {
+				throw new Error(
+					`Cannot find the Pigment Landmark Values for image ${image}`
+				);
+			}
+			const pigmentCoords = {
+				x: Math.round(pigmentLandmarkX * dimensions.width),
+				y: Math.round(pigmentLandmarkY * dimensions.height)
+			};
+			// console.log({
+			// 	mouthLandmark: facialLandmarks.find(
+			// 		({ Type: type }) => type === landmarkXType
+			// 	),
+			// 	noseLandmark: facialLandmarks.find(
+			// 		({ Type: type }) => type === landmarkYType
+			// 	),
+			// 	landmarks: { pigmentLandmarkX, pigmentLandmarkY },
+			// 	pigmentCoords
+			// });
+			const referenceColor = getPixelColor(pigmentCoords.x, pigmentCoords.y);
+			debugLog({ pigmentCoords, referenceColor });
+
+			if (indicate) {
+				// Add a pigment pixel indicator
+				indicativeScanCompositeInput.push({
+					input: {
+						create: {
+							width: 10,
+							height: 10,
+							channels: 4,
+							background: "rgba(250, 0, 0, 1)"
+						}
+					},
+					left: Math.round(dimensions.width * pigmentLandmarkX - 5),
+					top: Math.round(dimensions.height * pigmentLandmarkY - 5),
+					blend: "add"
+				});
+			}
+
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
 			const composite = [];
 			cAccessories.forEach((accessory) => {
@@ -176,6 +227,7 @@ mkdirp.sync(outputDir);
 
 				debugLog(
 					inspectObject({
+						name,
 						// accessory: accessory.name,
 						accessory,
 						addAccessory,
@@ -263,33 +315,6 @@ mkdirp.sync(outputDir);
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
 				// Skin can be observed by taking the pigment from the cheek/nose on the same side that the avatar is facing.
 				if (!accessory.skipPigmentCheck) {
-					const facialLandmarks = faceDetails.Landmarks;
-					const { X: pigmentLandmarkX } =
-						facialLandmarks.find(({ Type: type }) =>
-							type === isFacingLeft ? "noseRight" : "noseLeft"
-						) || {};
-					const { Y: pigmentLandmarkY } =
-						facialLandmarks.find(({ Type: type }) =>
-							type === isFacingLeft ? "mouthRight" : "mouthLeft"
-						) || {};
-					if (
-						_.isUndefined(pigmentLandmarkX) ||
-						_.isUndefined(pigmentLandmarkY)
-					) {
-						throw new Error(
-							`Cannot find the Pigment Landmark Values for image ${image}`
-						);
-					}
-					const pigmentCoords = {
-						x: Math.round(pigmentLandmarkX * dimensions.width),
-						y: Math.round(pigmentLandmarkY * dimensions.height)
-					};
-					const referenceColor = getPixelColor(
-						pigmentCoords.x,
-						pigmentCoords.y
-					);
-					debugLog({ referenceColor });
-
 					// Iterate over the pixels in the area that is overlapped by the composite image.
 					// -- 1. Extract that area out of the original image using Sharp
 					// -- 2. Iterate over every pixel using getImageData on each coordinate within that extracted image.
@@ -326,20 +351,6 @@ mkdirp.sync(outputDir);
 							},
 							left: extract.left,
 							top: extract.top
-						});
-						// Add a pigment pixel indicator
-						indicativeScanCompositeInput.push({
-							input: {
-								create: {
-									width: 10,
-									height: 10,
-									channels: 3,
-									background: "#000000"
-								}
-							},
-							left: Math.round(dimensions.width * pigmentLandmarkX - 5),
-							top: Math.round(dimensions.height * pigmentLandmarkY - 5),
-							blend: "add"
 						});
 					}
 					const colorDistanceThreshold = 15;
