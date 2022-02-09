@@ -47,28 +47,10 @@ const getCoords = async (
 				};
 			}
 
-			mouthTopCoords.x = Math.round(mouthTopCoords.x);
-			mouthTopCoords.y = Math.round(mouthTopCoords.y);
-			mouthBottomCoords.x = Math.round(mouthBottomCoords.x);
-			mouthBottomCoords.y = Math.round(mouthBottomCoords.y);
-
-			// Here, we're pushing the top of the mouth down to where the skin starts.
-			let skinStartY = mouthTopCoords.y;
-			for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
-				skinStartY = y;
-				const scanColor = getPixelColor(mouthTopCoords.x, y);
-				const diff = colorDifference.compare(skinReferenceColor, scanColor);
-				if (diff < 20) {
-					break;
-				}
-			}
-			// mouthTopCoords.y = Math.round(skinStartY * 1.05)
-			mouthTopCoords.y = skinStartY;
-
-			const mostMouthPixel = {
-				mDiff: null,
-				coords: {}
-			};
+			// mouthTopCoords.x = mouthTopCoords.x;
+			// mouthTopCoords.y = mouthTopCoords.y;
+			// mouthBottomCoords.x = mouthBottomCoords.x;
+			// mouthBottomCoords.y = mouthBottomCoords.y;
 
 			const mostLeftCoord =
 				mouthTopCoords.x < mouthBottomCoords.x
@@ -79,23 +61,57 @@ const getCoords = async (
 					? mouthBottomCoords
 					: mouthTopCoords;
 
-			// Start from the mouth bottom pixel
-			for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
-				for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
-					const scanColor = getPixelColor(x, y);
-					const mDiff = colorDifference.compare(mouthColor, scanColor);
-
-					// As close to mouth color, but as far from skin colour
-					if (mDiff < mostMouthPixel.mDiff || mostMouthPixel.mDiff === null) {
-						mostMouthPixel.mDiff = mDiff;
-						// mostMouthPixel.pDiff = pDiff;
-						mostMouthPixel.coords.x = x;
-						mostMouthPixel.coords.y = y;
-					}
-				}
+			// const mouthCenterX =
+			// 	mostLeftCoord.x + ((mostRightCoord.x - mostLeftCoord.x) / 4) * 3;
+			const mouthCenterX =
+				mostLeftCoord.x + (mostRightCoord.x - mostLeftCoord.x) / 2;
+			// const mouthCenterY =
+			// 	mouthTopCoords.y + ((mouthBottomCoords.y - mouthTopCoords.y) / 4) * 3;
+			const mouthCenterY =
+				mouthTopCoords.y + (mouthBottomCoords.y - mouthTopCoords.y) / 2;
+			const centerColor = getPixelColor(mouthCenterX, mouthCenterY);
+			// If the center if the mouth is a different colour to the skin and close to the mouth colour
+			const sDiff = colorDifference.compare(skinReferenceColor, centerColor);
+			const mDiff = colorDifference.compare(mouthColor, centerColor);
+			if (sDiff >= 20 && mDiff <= 20) {
+				return {
+					x: Math.round(
+						mostLeftCoord.x + ((mostRightCoord.x - mostLeftCoord.x) / 4) * 3
+					),
+					y: Math.round(
+						mouthTopCoords.y +
+							((mouthBottomCoords.y - mouthTopCoords.y) / 4) * 3
+					)
+				};
 			}
 
-			return mostMouthPixel.coords;
+			return {
+				x: Math.round(mouthBottomCoords.x),
+				y: Math.round(mouthBottomCoords.y)
+			};
+
+			// const mostMouthPixel = {
+			// 	mDiff: null,
+			// 	coords: {}
+			// };
+
+			// // Start from the mouth bottom pixel
+			// for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
+			// 	for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
+			// 		const scanColor = getPixelColor(x, y);
+			// 		const mDiff = colorDifference.compare(mouthColor, scanColor);
+
+			// 		// As close to mouth color, but as far from skin colour
+			// 		if (mDiff < mostMouthPixel.mDiff || mostMouthPixel.mDiff === null) {
+			// 			mostMouthPixel.mDiff = mDiff;
+			// 			// mostMouthPixel.pDiff = pDiff;
+			// 			mostMouthPixel.coords.x = x;
+			// 			mostMouthPixel.coords.y = y;
+			// 		}
+			// 	}
+			// }
+
+			// return mostMouthPixel.coords;
 		},
 		forNose() {
 			// Then get the mouth landmark to determine the coordinates
