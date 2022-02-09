@@ -1,19 +1,10 @@
 const _ = require("lodash");
 const sizeOf = require("image-size");
 const colorDifference = require("color-difference");
-const Color = require("color");
 
-const SKIN_COLOR = "#CA978B";
-const MOUTH_COLOR = "#AE5551"; // This is the mouth colour for the given skin colour.
-const cColor = Color(SKIN_COLOR);
-const cLum = cColor.luminosity();
+const mouthColors = ["#AE5551", "#874F44"];
 
-const getCoords = async (
-	image,
-	awsFacialData,
-	getPixelColor,
-	skinReferenceColor
-) => {
+const getCoords = async (image, awsFacialData, getPixelColor) => {
 	const dimensions = await sizeOf(image);
 	const facialLandmarks = _.get(awsFacialData, "FaceDetails[0].Landmarks", []);
 
@@ -58,21 +49,8 @@ const getCoords = async (
 			mouthBottomCoords.x = Math.round(mouthBottomCoords.x);
 			mouthBottomCoords.y = Math.round(mouthBottomCoords.y);
 
-			// We need to determine how much darker the skinReferenceColor is to the Constant Skin Color.
-			// Then we need to darken the mouth colour accordingly.
-			const rColor = Color(`#${skinReferenceColor}`);
-			const rLum = rColor.luminosity();
-			const diffLum = cLum - rLum;
-			let mouthColor = MOUTH_COLOR;
-			if (diffLum > 0) {
-				// If the reference colour is indeed darker
-				mouthColor = Color(MOUTH_COLOR).darken(diffLum);
-			}
-			console.log({ cLum, rLum, diffLum, skinReferenceColor, mouthColor });
-
 			const mostMouthPixel = {
 				mDiff: null,
-				// pDiff: null,
 				coords: {}
 			};
 
@@ -86,23 +64,28 @@ const getCoords = async (
 					: mouthTopCoords;
 
 			// Start from the mouth bottom pixel
-			for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
-				for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
-					const scanColor = getPixelColor(x, y);
-					const mDiff = colorDifference.compare(mouthColor, scanColor);
-					// const pDiff = colorDifference.compare(pigmentColor, scanColor);
+			for (let i = 0; i < mouthColors.length; i += 1) {
+				const mouthColor = mouthColors[i];
 
-					// As close to mouth color, but as far from skin colour
-					if (
-						mDiff < mostMouthPixel.mDiff ||
-						mostMouthPixel.mDiff === null
-						// (pDiff > mostMouthPixel.pDiff || mostMouthPixel.pDiff === null)
-					) {
-						mostMouthPixel.mDiff = mDiff;
-						// mostMouthPixel.pDiff = pDiff;
-						mostMouthPixel.coords.x = x;
-						mostMouthPixel.coords.y = y;
+				for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
+					for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
+						const scanColor = getPixelColor(x, y);
+						const mDiff = colorDifference.compare(mouthColor, scanColor);
+
+						// As close to mouth color, but as far from skin colour
+						if (mDiff < mostMouthPixel.mDiff || mostMouthPixel.mDiff === null) {
+							mostMouthPixel.mDiff = mDiff;
+							// mostMouthPixel.pDiff = pDiff;
+							mostMouthPixel.coords.x = x;
+							mostMouthPixel.coords.y = y;
+						}
 					}
+				}
+
+				console.log(mostMouthPixel);
+
+				if (mostMouthPixel.mDiff <= 10) {
+					break;
 				}
 			}
 
