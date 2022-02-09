@@ -197,7 +197,8 @@ mkdirp.sync(outputDir);
 					(faceDetails.AgeRange.Low + faceDetails.AgeRange.High) / 2 < 18;
 				if (
 					selectedLocation === "mouth" &&
-					(isUnderage || faceDetails.MouthOpen.Value === false)
+					isUnderage
+					// || faceDetails.MouthOpen.Value === false)
 				) {
 					return;
 				}
