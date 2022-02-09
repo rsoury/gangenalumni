@@ -284,17 +284,10 @@ mkdirp.sync(outputDir);
 						x: Math.round(pigmentLandmarkX * dimensions.width),
 						y: Math.round(pigmentLandmarkY * dimensions.height)
 					};
-					// const pigmentPixel = getPixel(pigmentCoords.x, pigmentCoords.y);
-					// const referenceColor = rgbToHex(
-					// 	pigmentPixel[0],
-					// 	pigmentPixel[1],
-					// 	pigmentPixel[2]
-					// );
 					const referenceColor = getPixelColor(
 						pigmentCoords.x,
 						pigmentCoords.y
 					);
-					// debugLog({ pigmentPixel, referenceColor });
 					debugLog({ referenceColor });
 
 					// Iterate over the pixels in the area that is overlapped by the composite image.
@@ -316,12 +309,6 @@ mkdirp.sync(outputDir);
 							x < extract.left + extract.width;
 							x += 1
 						) {
-							// const scanPixel = getPixel(x, y);
-							// const scanColor = rgbToHex(
-							// 	scanPixel[0],
-							// 	scanPixel[1],
-							// 	scanPixel[2]
-							// );
 							const scanColor = getPixelColor(x, y);
 							diff.push(colorDifference.compare(referenceColor, scanColor));
 						}

@@ -80,7 +80,8 @@ const getCoords = async (image, awsFacialData, getPixelColor) => {
 					? mouthBottomCoords
 					: mouthTopCoords;
 
-			for (let { y } = mouthTopCoords; y <= mouthBottomCoords.y; y += 1) {
+			// Start from the mouth bottom pixel
+			for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
 				for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
 					const scanColor = getPixelColor(x, y);
 					const mDiff = colorDifference.compare(MOUTH_COLOUR, scanColor);
