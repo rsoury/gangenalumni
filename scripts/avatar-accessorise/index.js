@@ -112,7 +112,6 @@ mkdirp.sync(outputDir);
 				const hex = hexWithAlpha.slice(0, -2);
 				return hex;
 			};
-			const coords = await getCoords(image, faceData, getPixelColor);
 
 			// 4. Duplicate/Clone the accessories and randomly re-order to ensure that all accessories have the same opportunity to apply to the avatar
 			const cAccessories = _.shuffle(clone(accessories));
@@ -123,7 +122,6 @@ mkdirp.sync(outputDir);
 			const indicativeScanCompositeInput = [];
 
 			const facialLandmarks = faceDetails.Landmarks;
-			// TODO: pigmentLandmark values are incorrect...
 			let landmarkXType = "mouthLeft";
 			let landmarkYType = "noseLeft";
 			if (isFacingLeft) {
@@ -143,18 +141,15 @@ mkdirp.sync(outputDir);
 				x: Math.round(pigmentLandmarkX * dimensions.width),
 				y: Math.round(pigmentLandmarkY * dimensions.height)
 			};
-			// console.log({
-			// 	mouthLandmark: facialLandmarks.find(
-			// 		({ Type: type }) => type === landmarkXType
-			// 	),
-			// 	noseLandmark: facialLandmarks.find(
-			// 		({ Type: type }) => type === landmarkYType
-			// 	),
-			// 	landmarks: { pigmentLandmarkX, pigmentLandmarkY },
-			// 	pigmentCoords
-			// });
 			const referenceColor = getPixelColor(pigmentCoords.x, pigmentCoords.y);
 			debugLog({ pigmentCoords, referenceColor });
+
+			const coords = await getCoords(
+				image,
+				faceData,
+				getPixelColor,
+				referenceColor
+			);
 
 			if (indicate) {
 				// Add a pigment pixel indicator
@@ -164,7 +159,7 @@ mkdirp.sync(outputDir);
 							width: 10,
 							height: 10,
 							channels: 4,
-							background: "rgba(250, 0, 0, 1)"
+							background: "rgba(255, 0, 0, 1)"
 						}
 					},
 					left: Math.round(dimensions.width * pigmentLandmarkX - 5),

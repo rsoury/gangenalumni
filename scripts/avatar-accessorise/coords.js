@@ -1,11 +1,19 @@
 const _ = require("lodash");
 const sizeOf = require("image-size");
 const colorDifference = require("color-difference");
+const Color = require("color");
 
-const SKIN_COLOUR = "#CA978B";
-const MOUTH_COLOUR = "#AE5551"; // This is the mouth colour for the given skin colour.
+const SKIN_COLOR = "#CA978B";
+const MOUTH_COLOR = "#AE5551"; // This is the mouth colour for the given skin colour.
+const cColor = Color(SKIN_COLOR);
+const cLum = cColor.luminosity();
 
-const getCoords = async (image, awsFacialData, getPixelColor) => {
+const getCoords = async (
+	image,
+	awsFacialData,
+	getPixelColor,
+	skinReferenceColor
+) => {
 	const dimensions = await sizeOf(image);
 	const facialLandmarks = _.get(awsFacialData, "FaceDetails[0].Landmarks", []);
 
@@ -43,30 +51,24 @@ const getCoords = async (image, awsFacialData, getPixelColor) => {
 				};
 			}
 
-			// // Get pigment pixel -- Get as close to mouth while as far from skin
-			// const faceDetails = awsFacialData.FaceDetails[0];
-			// const yaw = faceDetails.Pose.Yaw;
-			// const isFacingLeft = yaw < 0;
-			// const { X: pigmentLandmarkX } =
-			// 	facialLandmarks.find(({ Type: type }) =>
-			// 		type === isFacingLeft ? "noseRight" : "noseLeft"
-			// 	) || {};
-			// const { Y: pigmentLandmarkY } =
-			// 	facialLandmarks.find(({ Type: type }) =>
-			// 		type === isFacingLeft ? "mouthRight" : "mouthLeft"
-			// 	) || {};
-			// const pigmentCoords = {
-			// 	x: Math.round(pigmentLandmarkX * dimensions.width),
-			// 	y: Math.round(pigmentLandmarkY * dimensions.height)
-			// };
-			// const pigmentColor = getPixelColor(pigmentCoords.x, pigmentCoords.y);
-
 			mouthTopCoords.x = Math.round(mouthTopCoords.x);
 			// mouthTopCoords.y = Math.round(mouthTopCoords.y);
-			const yBuffer = ((mouthBottomCoords.y - mouthTopCoords.y) / 4) * 3;
+			const yBuffer = (mouthBottomCoords.y - mouthTopCoords.y) / 2;
 			mouthTopCoords.y = Math.round(mouthTopCoords.y + yBuffer); // Get the half way point between mouthTop mouthBottom
 			mouthBottomCoords.x = Math.round(mouthBottomCoords.x);
-			mouthBottomCoords.y = Math.round(mouthBottomCoords.y + yBuffer);
+			mouthBottomCoords.y = Math.round(mouthBottomCoords.y);
+
+			// We need to determine how much darker the skinReferenceColor is to the Constant Skin Color.
+			// Then we need to darken the mouth colour accordingly.
+			const rColor = Color(`#${skinReferenceColor}`);
+			const rLum = rColor.luminosity();
+			const diffLum = cLum - rLum;
+			let mouthColor = MOUTH_COLOR;
+			if (diffLum > 0) {
+				// If the reference colour is indeed darker
+				mouthColor = Color(MOUTH_COLOR).darken(diffLum);
+			}
+			console.log({ cLum, rLum, diffLum, skinReferenceColor, mouthColor });
 
 			const mostMouthPixel = {
 				mDiff: null,
@@ -87,7 +89,7 @@ const getCoords = async (image, awsFacialData, getPixelColor) => {
 			for (let { y } = mouthBottomCoords; y >= mouthTopCoords.y; y -= 1) {
 				for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
 					const scanColor = getPixelColor(x, y);
-					const mDiff = colorDifference.compare(MOUTH_COLOUR, scanColor);
+					const mDiff = colorDifference.compare(mouthColor, scanColor);
 					// const pDiff = colorDifference.compare(pigmentColor, scanColor);
 
 					// As close to mouth color, but as far from skin colour
