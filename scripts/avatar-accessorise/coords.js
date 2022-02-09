@@ -1,10 +1,8 @@
 const _ = require("lodash");
 const sizeOf = require("image-size");
-// const { createCanvas } = require("canvas");
 const colorDifference = require("color-difference");
-// const { rgbToHex } = require("../utils");
 
-const MOUTH_COLOUR = "#974B49";
+const MOUTH_COLOUR = "#AE5551";
 
 const getCoords = async (image, awsFacialData, getPixelColor) => {
 	const dimensions = await sizeOf(image);
@@ -44,38 +42,57 @@ const getCoords = async (image, awsFacialData, getPixelColor) => {
 				};
 			}
 
+			// Get pigment pixel -- Get as close to mouth while as far from skin
+			const faceDetails = awsFacialData.FaceDetails[0];
+			const yaw = faceDetails.Pose.Yaw;
+			const isFacingLeft = yaw < 0;
+			const { X: pigmentLandmarkX } =
+				facialLandmarks.find(({ Type: type }) =>
+					type === isFacingLeft ? "noseRight" : "noseLeft"
+				) || {};
+			const { Y: pigmentLandmarkY } =
+				facialLandmarks.find(({ Type: type }) =>
+					type === isFacingLeft ? "mouthRight" : "mouthLeft"
+				) || {};
+			const pigmentCoords = {
+				x: Math.round(pigmentLandmarkX * dimensions.width),
+				y: Math.round(pigmentLandmarkY * dimensions.height)
+			};
+			const pigmentColor = getPixelColor(pigmentCoords.x, pigmentCoords.y);
+
 			mouthTopCoords.x = Math.round(mouthTopCoords.x);
 			mouthTopCoords.y = Math.round(mouthTopCoords.y);
 			mouthBottomCoords.x = Math.round(mouthBottomCoords.x);
 			mouthBottomCoords.y = Math.round(mouthBottomCoords.y);
 
-			const mostMouthPixel = { diff: null, coords: { x: 0, y: 0 } };
+			const mostMouthPixel = {
+				mDiff: null,
+				pDiff: null,
+				coords: { x: 0, y: 0 }
+			};
 
 			const mostLeftCoord =
-				mouthTopCoords.X < mouthBottomCoords.X
+				mouthTopCoords.x < mouthBottomCoords.x
 					? mouthTopCoords
 					: mouthBottomCoords;
 			const mostRightCoord =
-				mouthTopCoords.X < mouthBottomCoords.X
+				mouthTopCoords.x < mouthBottomCoords.x
 					? mouthBottomCoords
 					: mouthTopCoords;
 
-			for (
-				let y = mouthTopCoords.Y;
-				y <= mouthTopCoords.Y + mouthBottomCoords.Y;
-				y += 1
-			) {
-				for (
-					let x = mostLeftCoord.X;
-					x <= mostLeftCoord.X + mostRightCoord.X;
-					x += 1
-				) {
-					// const scanPixel = getPixel(x, y);
-					// const scanColor = rgbToHex(scanPixel[0], scanPixel[1], scanPixel[2]);
+			for (let { y } = mouthTopCoords; y <= mouthBottomCoords.y; y += 1) {
+				for (let { x } = mostLeftCoord; x <= mostRightCoord.x; x += 1) {
 					const scanColor = getPixelColor(x, y);
-					const diff = colorDifference.compare(MOUTH_COLOUR, scanColor);
-					if (diff < mostMouthPixel.diff || mostMouthPixel.diff === null) {
-						mostMouthPixel.diff = diff;
+					const mDiff = colorDifference.compare(MOUTH_COLOUR, scanColor);
+					const pDiff = colorDifference.compare(pigmentColor, scanColor);
+
+					// As close to mouth color, but as far from skin colour
+					if (
+						(mDiff < mostMouthPixel.mDiff || mostMouthPixel.mDiff === null) &&
+						(pDiff > mostMouthPixel.pDiff || mostMouthPixel.pDiff === null)
+					) {
+						mostMouthPixel.mDiff = mDiff;
+						mostMouthPixel.pDiff = pDiff;
 						mostMouthPixel.coords.x = x;
 						mostMouthPixel.coords.y = y;
 					}

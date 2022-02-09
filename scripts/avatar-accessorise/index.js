@@ -15,7 +15,6 @@ const _ = require("lodash");
 const clone = require("deep-clone");
 const sizeOf = require("image-size");
 const hex2dec = require("hex2dec");
-// const { createCanvas, loadImage } = require("canvas");
 const colorDifference = require("color-difference");
 const SegfaultHandler = require("segfault-handler");
 const Jimp = require("jimp");
@@ -106,13 +105,6 @@ mkdirp.sync(outputDir);
 				);
 			}
 
-			// const canvasImage = await loadImage(image);
-			// const canvas = createCanvas(dimensions.width, dimensions.height);
-			// const ctx = canvas.getContext("2d");
-			// ctx.drawImage(canvasImage, 0, 0);
-			// const getPixel = (x, y) => {
-			// return ctx.getImageData(x, y, 1, 1).data;
-			// };
 			const jImage = await Jimp.read(image);
 			const getPixelColor = (x, y) => {
 				const colorInt = jImage.getPixelColor(x, y);
@@ -274,10 +266,12 @@ mkdirp.sync(outputDir);
 					const facialLandmarks = faceDetails.Landmarks;
 					const { X: pigmentLandmarkX } =
 						facialLandmarks.find(({ Type: type }) =>
-							type === isFacingLeft ? "noseLeft" : "noseRight"
+							type === isFacingLeft ? "noseRight" : "noseLeft"
 						) || {};
 					const { Y: pigmentLandmarkY } =
-						facialLandmarks.find(({ Type: type }) => type === "nose") || {};
+						facialLandmarks.find(({ Type: type }) =>
+							type === isFacingLeft ? "mouthRight" : "mouthLeft"
+						) || {};
 					if (
 						_.isUndefined(pigmentLandmarkX) ||
 						_.isUndefined(pigmentLandmarkY)
@@ -345,6 +339,20 @@ mkdirp.sync(outputDir);
 							},
 							left: extract.left,
 							top: extract.top
+						});
+						// Add a pigment pixel indicator
+						indicativeScanCompositeInput.push({
+							input: {
+								create: {
+									width: 10,
+									height: 10,
+									channels: 3,
+									background: "#000000"
+								}
+							},
+							left: Math.round(dimensions.width * pigmentLandmarkX - 5),
+							top: Math.round(dimensions.height * pigmentLandmarkY - 5),
+							blend: "add"
 						});
 					}
 					const colorDistanceThreshold = 15;

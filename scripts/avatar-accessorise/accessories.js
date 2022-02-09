@@ -106,7 +106,8 @@ const getAccessories = async () => {
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose"
+			directionBy: "pose",
+			skipPigmentCheck: true
 		},
 		{
 			name: "vape",
@@ -131,7 +132,8 @@ const getAccessories = async () => {
 			},
 			locations: ["mouth"],
 			elevate: 10,
-			directionBy: "pose"
+			directionBy: "pose",
+			skipPigmentCheck: true
 		},
 		noseScar,
 		{
