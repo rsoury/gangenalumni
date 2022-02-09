@@ -131,7 +131,7 @@ if (!s3) {
 		); // Wait for Profile "Secondary" Button
 
 		// Set Filter Name
-		const filterName = `Melody`;
+		const filterName = ` Bright`;
 
 		// Proceed with the Batch Image Processing
 		const [filterCellElement] = await page.$x(
