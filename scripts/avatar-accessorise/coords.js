@@ -1,12 +1,12 @@
 const _ = require("lodash");
 const sizeOf = require("image-size");
-const { createCanvas } = require("canvas");
+// const { createCanvas } = require("canvas");
 const colorDifference = require("color-difference");
-const { rgbToHex } = require("../utils");
+// const { rgbToHex } = require("../utils");
 
 const MOUTH_COLOUR = "#974B49";
 
-const getCoords = async (image, awsFacialData) => {
+const getCoords = async (image, awsFacialData, getPixelColor) => {
 	const dimensions = await sizeOf(image);
 	const facialLandmarks = _.get(awsFacialData, "FaceDetails[0].Landmarks", []);
 
@@ -19,7 +19,7 @@ const getCoords = async (image, awsFacialData) => {
 	};
 
 	return {
-		forMouth(canvasContext) {
+		forMouth() {
 			// Here we find the mouth...
 			// Interate over the Y pixels between the mouthTop and mouthBottom and find the pixel closest to the colour red.
 			// Then get the mouth landmark to determine the coordinates
@@ -33,7 +33,7 @@ const getCoords = async (image, awsFacialData) => {
 				x: mouthBottomLandmark.X * dimensions.width,
 				y: mouthBottomLandmark.Y * dimensions.height
 			};
-			if (!canvasContext) {
+			if (!getPixelColor) {
 				return {
 					x:
 						mouthTopCoords.x +
@@ -70,8 +70,9 @@ const getCoords = async (image, awsFacialData) => {
 					x <= mostLeftCoord.X + mostRightCoord.X;
 					x += 1
 				) {
-					const scanPixel = canvasContext.getImageData(x, y, 1, 1).data;
-					const scanColor = rgbToHex(scanPixel[0], scanPixel[1], scanPixel[2]);
+					// const scanPixel = getPixel(x, y);
+					// const scanColor = rgbToHex(scanPixel[0], scanPixel[1], scanPixel[2]);
+					const scanColor = getPixelColor(x, y);
 					const diff = colorDifference.compare(MOUTH_COLOUR, scanColor);
 					if (diff < mostMouthPixel.diff || mostMouthPixel.diff === null) {
 						mostMouthPixel.diff = diff;

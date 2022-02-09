@@ -14,9 +14,11 @@ const jsonfile = require("jsonfile");
 const _ = require("lodash");
 const clone = require("deep-clone");
 const sizeOf = require("image-size");
-const { createCanvas, loadImage } = require("canvas");
+const hex2dec = require("hex2dec");
+// const { createCanvas, loadImage } = require("canvas");
 const colorDifference = require("color-difference");
 const SegfaultHandler = require("segfault-handler");
+const Jimp = require("jimp");
 
 const Queue = require("../utils/queue");
 const options = require("../utils/options")((program) => {
@@ -32,7 +34,7 @@ const options = require("../utils/options")((program) => {
 });
 const getCoords = require("./coords");
 const getAccessories = require("./accessories");
-const { inspectObject, rgbToHex, getImages, getName } = require("../utils");
+const { inspectObject, getImages, getName } = require("../utils");
 const addLandmarkIndicators = require("./indicate");
 
 SegfaultHandler.registerHandler(
@@ -104,7 +106,21 @@ mkdirp.sync(outputDir);
 				);
 			}
 
-			const coords = await getCoords(image, faceData);
+			// const canvasImage = await loadImage(image);
+			// const canvas = createCanvas(dimensions.width, dimensions.height);
+			// const ctx = canvas.getContext("2d");
+			// ctx.drawImage(canvasImage, 0, 0);
+			// const getPixel = (x, y) => {
+			// return ctx.getImageData(x, y, 1, 1).data;
+			// };
+			const jImage = await Jimp.read(image);
+			const getPixelColor = (x, y) => {
+				const colorInt = jImage.getPixelColor(x, y);
+				const hexWithAlpha = hex2dec.decToHex(`${colorInt}`, { prefix: false });
+				const hex = hexWithAlpha.slice(0, -2);
+				return hex;
+			};
+			const coords = await getCoords(image, faceData, getPixelColor);
 
 			// 4. Duplicate/Clone the accessories and randomly re-order to ensure that all accessories have the same opportunity to apply to the avatar
 			const cAccessories = _.shuffle(clone(accessories));
@@ -112,10 +128,6 @@ mkdirp.sync(outputDir);
 			// Get size & pixels for image for later use
 			// const pixels = await getPixels(image);
 			const dimensions = await sizeOf(image);
-			const canvasImage = await loadImage(image);
-			const canvas = createCanvas(dimensions.width, dimensions.height);
-			const ctx = canvas.getContext("2d");
-			ctx.drawImage(canvasImage, 0, 0);
 			const indicativeScanCompositeInput = [];
 
 			// 5. Set up composite input settings for sharp -- Iterate over the accessories
@@ -195,7 +207,7 @@ mkdirp.sync(outputDir);
 				let featureCoords = {};
 				switch (selectedLocation) {
 					case "mouth": {
-						featureCoords = coords.forMouth(ctx);
+						featureCoords = coords.forMouth();
 						break;
 					}
 					case "nose": {
@@ -254,7 +266,6 @@ mkdirp.sync(outputDir);
 				if (_.isEmpty(featureCoords)) {
 					return;
 				}
-				debugLog({ featureCoords });
 
 				//* Check if the featureCoords area matches the colour of the avatar's skin to prevent adding an accessory of hair, or some other inherit feature.
 				// Is required in the circumstance an avatar is already wearing a hat, or has hair covering their forehead.
@@ -279,18 +290,18 @@ mkdirp.sync(outputDir);
 						x: Math.round(pigmentLandmarkX * dimensions.width),
 						y: Math.round(pigmentLandmarkY * dimensions.height)
 					};
-					const pigmentPixel = ctx.getImageData(
+					// const pigmentPixel = getPixel(pigmentCoords.x, pigmentCoords.y);
+					// const referenceColor = rgbToHex(
+					// 	pigmentPixel[0],
+					// 	pigmentPixel[1],
+					// 	pigmentPixel[2]
+					// );
+					const referenceColor = getPixelColor(
 						pigmentCoords.x,
-						pigmentCoords.y,
-						1,
-						1
-					).data;
-					const referenceColor = rgbToHex(
-						pigmentPixel[0],
-						pigmentPixel[1],
-						pigmentPixel[2]
+						pigmentCoords.y
 					);
-					debugLog({ pigmentPixel, referenceColor });
+					// debugLog({ pigmentPixel, referenceColor });
+					debugLog({ referenceColor });
 
 					// Iterate over the pixels in the area that is overlapped by the composite image.
 					// -- 1. Extract that area out of the original image using Sharp
@@ -311,12 +322,13 @@ mkdirp.sync(outputDir);
 							x < extract.left + extract.width;
 							x += 1
 						) {
-							const scanPixel = ctx.getImageData(x, y, 1, 1).data;
-							const scanColor = rgbToHex(
-								scanPixel[0],
-								scanPixel[1],
-								scanPixel[2]
-							);
+							// const scanPixel = getPixel(x, y);
+							// const scanColor = rgbToHex(
+							// 	scanPixel[0],
+							// 	scanPixel[1],
+							// 	scanPixel[2]
+							// );
+							const scanColor = getPixelColor(x, y);
 							diff.push(colorDifference.compare(referenceColor, scanColor));
 						}
 					}
